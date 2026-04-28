@@ -1,0 +1,12 @@
+[submodule "lib/epr-register-case-management-backend-poc"]
+	path = lib/epr-register-case-management-backend-poc
+	url = git@github.com:tomhalley/epr-register-case-management-backend-poc.git
+[submodule "lib/epr-register-case-management-frontend-poc"]
+	path = lib/epr-register-case-management-frontend-poc
+	url = git@github.com:tomhalley/epr-register-case-management-frontend-poc.git
+[submodule "lib/epr-register-enrol-backend"]
+	path = lib/epr-register-enrol-backend
+	url = git@github.com:DEFRA/epr-register-enrol-backend.git
+[submodule "lib/epr-register-enrol-frontend"]
+	path = lib/epr-register-enrol-frontend
+	url = https://github.com/DEFRA/epr-register-enrol-frontend.git
