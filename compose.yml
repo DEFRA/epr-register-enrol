@@ -1,0 +1,150 @@
+version: '3.4'
+
+# Root Docker Compose stack for the EPR Register Case Management PoC.
+# Brings up both services (frontend + backend) and their dependencies
+# (MongoDB, Redis, Floci AWS emulator) on a single shared network.
+#
+# Usage:
+#   docker compose up --build -d            # plain run (production-style frontend, watch-capable backend image)
+#   docker compose up --watch               # hot-reload: syncs source into the dev images
+#   docker compose down -v
+#
+# With --watch:
+#   - Backend runs `dotnet watch` inside the container; .cs/.json edits under
+#     Backend.Api/ are synced and trigger an in-process rebuild. Edits to the
+#     .csproj or .sln rebuild the image.
+#   - Frontend runs `nodemon` inside the container; edits under src/ are synced
+#     and nodemon restarts the server. Edits to package*.json or vite.config.js
+#     rebuild the image.
+#
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8085
+
+services:
+  floci:
+    image: hectorvent/floci:latest-aws
+    ports:
+      - '4566:4566'
+    env_file:
+      - ./lib/epr-register-case-management-frontend-poc/compose/aws.env
+    environment:
+      FLOCI_DEFAULT_REGION: eu-west-2
+    volumes:
+      - ./lib/epr-register-case-management-frontend-poc/compose/floci/start.d:/etc/floci/init/start.d:ro
+    networks:
+      - cdp-tenant
+
+  redis:
+    image: redis:7.2.3-alpine3.18
+    ports:
+      - '6379:6379'
+    networks:
+      - cdp-tenant
+
+  mongodb:
+    image: mongo:7.0.28
+    networks:
+      - cdp-tenant
+    ports:
+      - '27017:27017'
+    volumes:
+      - ./lib/epr-register-case-management-frontend-poc/compose/mongo:/docker-entrypoint-initdb.d:ro
+      - mongodb-data:/data
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.hello().ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ################################################################################
+
+  case-management-backend:
+    build:
+      context: ./lib/epr-register-case-management-backend-poc
+      target: development
+    container_name: case-management-backend
+    ports:
+      - '8085:8085'
+    depends_on:
+      floci:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    env_file:
+      - ./lib/epr-register-case-management-backend-poc/compose/aws.env
+    environment:
+      ASPNETCORE_URLS: http://+:8085
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      Mongo__DatabaseUri: mongodb://mongodb:27017/
+      Mongo__DatabaseName: epr-register-case-management
+      WorkItems__SeedOnStartup: "true"
+    networks:
+      - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-case-management-backend-poc/Backend.Api
+          target: /src/Backend.Api
+          ignore:
+            - bin/
+            - obj/
+        - action: rebuild
+          path: ./lib/epr-register-case-management-backend-poc/Backend.Api/Backend.Api.csproj
+        - action: rebuild
+          path: ./lib/epr-register-case-management-backend-poc/CdpDotnetBackendTemplate.sln
+
+  case-management-frontend:
+    build:
+      context: ./lib/epr-register-case-management-frontend-poc
+      target: development
+    container_name: case-management-frontend
+    ports:
+      - '3000:3000'
+      - '9229:9229'
+    depends_on:
+      floci:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      case-management-backend:
+        condition: service_started
+    env_file:
+      - ./lib/epr-register-case-management-frontend-poc/compose/aws.env
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      REDIS_HOST: redis
+      LOG_FORMAT: pino-pretty
+      SESSION_COOKIE_SECURE: false
+      USE_SINGLE_INSTANCE_CACHE: true
+      REDIS_TLS: false
+      BACKEND_API_URL: http://case-management-backend:8085
+    networks:
+      - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-case-management-frontend-poc/src
+          target: /home/node/src
+          ignore:
+            - node_modules/
+        - action: sync
+          path: ./lib/epr-register-case-management-frontend-poc/test-helpers
+          target: /home/node/test-helpers
+        - action: rebuild
+          path: ./lib/epr-register-case-management-frontend-poc/package.json
+        - action: rebuild
+          path: ./lib/epr-register-case-management-frontend-poc/package-lock.json
+        - action: rebuild
+          path: ./lib/epr-register-case-management-frontend-poc/vite.config.js
+
+################################################################################
+
+volumes:
+  mongodb-data:
+
+networks:
+  cdp-tenant:
+    driver: bridge
