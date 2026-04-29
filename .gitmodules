@@ -1,8 +1,8 @@
 [submodule "lib/epr-register-case-management-backend-poc"]
-	path = lib/epr-register-case-management-backend-poc
+	path = lib/epr-register-enrol-management-be
 	url = git@github.com:tomhalley/epr-register-case-management-backend-poc.git
 [submodule "lib/epr-register-case-management-frontend-poc"]
-	path = lib/epr-register-case-management-frontend-poc
+	path = lib/epr-register-enrol-management-fe
 	url = git@github.com:tomhalley/epr-register-case-management-frontend-poc.git
 [submodule "lib/epr-register-enrol-backend"]
 	path = lib/epr-register-enrol-backend
