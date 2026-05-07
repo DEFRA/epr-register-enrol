@@ -32,10 +32,17 @@ services:
     networks:
       - cdp-tenant
 
+
   redis:
     image: redis:7.2.3-alpine3.18
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - cdp-tenant
 
@@ -55,6 +62,19 @@ services:
       retries: 3
       start_period: 30s
 
+
+  mongodb-init:
+    build:
+      context: ./lib/epr-register-enrol-backend/
+      dockerfile: Dockerfile.init
+    depends_on:
+      mongodb:
+        condition: service_started
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+    networks:
+      - cdp-tenant   
+
   ################################################################################
 
   case-management-backend:
@@ -63,7 +83,7 @@ services:
       target: development
     container_name: case-management-backend
     ports:
-      - '8085:8085'
+      - '9085:9085'
     depends_on:
       floci:
         condition: service_healthy
@@ -72,7 +92,7 @@ services:
     env_file:
       - ./lib/epr-register-enrol-management-be/compose/aws.env
     environment:
-      ASPNETCORE_URLS: http://+:8085
+      ASPNETCORE_URLS: http://+:9085
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       Mongo__DatabaseUri: mongodb://mongodb:27017/
@@ -99,7 +119,7 @@ services:
       target: development
     container_name: case-management-frontend
     ports:
-      - '3000:3000'
+      - '5001:5000'
       - '9229:9229'
     depends_on:
       floci:
@@ -111,7 +131,7 @@ services:
     env_file:
       - ./lib/epr-register-enrol-management-fe/compose/aws.env
     environment:
-      PORT: 3000
+      PORT: 5000
       NODE_ENV: development
       REDIS_HOST: redis
       LOG_FORMAT: pino-pretty
@@ -137,6 +157,71 @@ services:
           path: ./lib/epr-register-enrol-management-fe/package-lock.json
         - action: rebuild
           path: ./lib/epr-register-enrol-management-fe/vite.config.js
+
+
+
+  epr-register-enrol-backend:
+#    image: defradigital/epr-register-enrol-backend:${EPR_REGISTER_ENROL_BACKEND:-latest}
+    build: ./lib/epr-register-enrol-backend/
+    platform: linux/amd64
+    links:
+    - 'floci:floci'
+    - 'mongodb:mongodb'
+    environment:
+      PORT: 8080
+      LOCALSTACK_ENDPOINT: 'http://floci:4566'
+      MONGO_URI: 'mongodb://mongodb:27017/'
+      ASPNETCORE_ENVIRONMENT: Development
+    depends_on:
+      floci:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      mongodb-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: ['CMD', 'curl', 'http://epr-register-enrol-backend:8080/health']
+      interval: 3s
+      start_period: 2s
+      retries: 3
+    networks:
+      - cdp-tenant
+
+  epr-register-enrol-frontend:
+    build: ./lib/epr-register-enrol-frontend/
+    ports:
+      - '3000:3000'
+    links:
+     - 'floci:floci'
+     - 'redis:redis'
+    depends_on:
+     floci:
+       condition: service_healthy
+     redis:
+       condition: service_started
+    env_file:
+      - './lib/epr-register-enrol-frontend/compose/aws.env'
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      REDIS_HOST: redis
+      LOCALSTACK_ENDPOINT: http://floci:4566
+      USE_SINGLE_INSTANCE_CACHE: true
+      API_BASE_URL: http://epr-register-enrol-backend:8080
+      API_OAUTH2_CLIENT_ID: epr-register-enrol-frontend
+      API_OAUTH2_CLIENT_SECRET: 2c6e43f5-9a3c-4559-863a-741d2fcda42b
+      API_OAUTH2_TOKEN_URL: http://epr-register-enrol-backend:8080/token
+      API_OAUTH2_SCOPE: read write
+      API_TIMEOUT: 5000
+
+    networks:
+      - cdp-tenant
+
+
 
 ################################################################################
 
