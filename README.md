@@ -81,8 +81,10 @@ docker compose down -v         # stop and remove containers + volumes
 
 | Service | URL |
 | --- | --- |
-| Case-management frontend | http://localhost:3000 |
-| Case-management backend  | http://localhost:8085 |
+| Case-management frontend        | http://localhost:5001 |
+| Case-management backend         | http://localhost:8085 |
+| EPR Register & Enrol frontend   | http://localhost:3000 |
+| EPR Register & Enrol backend    | http://localhost:8080 |
 
 (See each submodule's own `README.md` for ports and configuration specific to
 that service.)
