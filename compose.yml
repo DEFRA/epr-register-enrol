@@ -170,7 +170,8 @@ services:
     environment:
       PORT: 8080
       LOCALSTACK_ENDPOINT: 'http://floci:4566'
-      MONGO_URI: 'mongodb://mongodb:27017/'
+      Mongo__DatabaseUri: 'mongodb://mongodb:27017/'
+      Mongo__DatabaseName: epr
       ASPNETCORE_ENVIRONMENT: Development
     depends_on:
       floci:
@@ -192,19 +193,22 @@ services:
       - cdp-tenant
 
   epr-register-enrol-frontend:
-    image: defradigital/epr-register-enrol-frontend:${EPR_REGISTER_ENROL_FRONTEND:-latest}
+    # image: defradigital/epr-register-enrol-frontend:${EPR_REGISTER_ENROL_FRONTEND:-latest}
     platform: linux/amd64
-    #    build: ./lib/epr-register-enrol-frontend/
+    build: ./lib/epr-register-enrol-frontend/
     ports:
       - '3000:3000'
     links:
       - 'floci:floci'
       - 'redis:redis'
+      - 'epr-register-enrol-backend:epr-register-enrol-backend'
     depends_on:
       floci:
         condition: service_healthy
       redis:
         condition: service_started
+      epr-register-enrol-backend:
+        condition: service_healthy
     env_file:
       - './lib/epr-register-enrol-frontend/compose/aws.env'
     environment:
@@ -213,11 +217,11 @@ services:
       REDIS_HOST: redis
       LOCALSTACK_ENDPOINT: http://floci:4566
       USE_SINGLE_INSTANCE_CACHE: true
-      API_BASE_URL: http://localhost:8080
+      API_BASE_URL: http://epr-register-enrol-backend:8080
       API_OAUTH2_CLIENT_ID: epr-register-enrol-frontend
-      API_STUB_ENABLED: true
+      API_STUB_ENABLED: false
       API_OAUTH2_CLIENT_SECRET: 2c6e43f5-9a3c-4559-863a-741d2fcda42b
-      API_OAUTH2_TOKEN_URL: http://localhost:8080/token
+      API_OAUTH2_TOKEN_URL: http://epr-register-enrol-backend:8080/token
       API_OAUTH2_SCOPE: read write
       API_TIMEOUT: 5000
       ASPNETCORE_ENVIRONMENT: Development
