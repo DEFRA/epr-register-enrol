@@ -9,6 +9,7 @@ are tracked here as **git submodules** under `lib/`:
 | [`lib/epr-register-enrol-backend`](lib/epr-register-enrol-backend) | Public-facing register & enrol backend |
 | [`lib/epr-register-enrol-management-fe`](lib/epr-register-enrol-management-fe) | Internal case-management frontend |
 | [`lib/epr-register-enrol-management-be`](lib/epr-register-enrol-management-be) | Internal case-management backend |
+| [`lib/epr-register-enrol-fe-tests`](lib/epr-register-enrol-fe-tests) | Frontend end-to-end tests *(not cloned by default)* |
 
 ## Cloning
 
@@ -47,6 +48,13 @@ If you only need to sync to the SHAs already pinned in this repo (i.e. you do
 ```bash
 git submodule update --init --recursive
 ```
+
+> **Note:** `lib/epr-register-enrol-fe-tests` is excluded from the above
+> commands (`update = none`). To clone it explicitly when needed:
+>
+> ```bash
+> git submodule update --init lib/epr-register-enrol-fe-tests
+> ```
 
 ## Running locally
 
