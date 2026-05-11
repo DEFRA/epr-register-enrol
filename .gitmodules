@@ -11,7 +11,4 @@
 	path = lib/epr-register-enrol-frontend
 	url = git@github.com:DEFRA/epr-register-enrol-frontend.git
 [submodule "lib/epr-register-enrol-fe-tests"]
-	path = lib/epr-register-enrol-fe-tests
-	url = git@github.com:DEFRA/epr-register-enrol-fe-tests.git
 	update = none
-
