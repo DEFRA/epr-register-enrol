@@ -231,6 +231,42 @@ services:
 
 
 ################################################################################
+# Journey test services (opt-in: docker compose --profile tests run --rm mgmt-tests)
+#
+# selenium-chrome provides a remote WebDriver endpoint; mgmt-tests runs the
+# WDIO suite from epr-register-enrol-mgmt-tests against the already-running
+# case-management-frontend container. Both services join cdp-tenant so they
+# can reach the other services by container name.
+#
+# Usage:
+#   docker compose up -d                            # start the stack
+#   docker compose --profile tests run --rm mgmt-tests  # run tests once
+
+  selenium-chrome:
+    image: selenium/standalone-chrome:123.0
+    networks:
+      - cdp-tenant
+    profiles:
+      - tests
+
+  mgmt-tests:
+    build:
+      context: ./lib/epr-register-enrol-mgmt-tests
+    environment:
+      BASE_URL: http://case-management-frontend:5000
+      CHROMEDRIVER_URL: selenium-chrome
+      CHROMEDRIVER_PORT: "4444"
+    depends_on:
+      case-management-frontend:
+        condition: service_started
+      selenium-chrome:
+        condition: service_started
+    networks:
+      - cdp-tenant
+    profiles:
+      - tests
+
+################################################################################
 
 volumes:
   mongodb-data:
