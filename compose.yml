@@ -244,6 +244,8 @@ services:
 
   selenium-chrome:
     image: selenium/standalone-chrome:123.0
+    ports:
+      - '4444:4444'
     networks:
       - cdp-tenant
     profiles:
@@ -252,10 +254,12 @@ services:
   mgmt-tests:
     build:
       context: ./lib/epr-register-enrol-mgmt-tests
+    # Override the entrypoint so the S3 publish step is skipped in local dev
+    entrypoint: ["npm", "test"]
     environment:
       BASE_URL: http://case-management-frontend:5000
       CHROMEDRIVER_URL: selenium-chrome
-      CHROMEDRIVER_PORT: "4444"
+      CHROMEDRIVER_PORT: 4444
     depends_on:
       case-management-frontend:
         condition: service_started
