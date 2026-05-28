@@ -27,6 +27,7 @@ services:
       - ./lib/epr-register-enrol-management-fe/compose/aws.env
     environment:
       FLOCI_DEFAULT_REGION: eu-west-2
+      AWS_ENDPOINT_URL: http://floci:4566
     volumes:
       - ./lib/epr-register-enrol-management-fe/compose/floci/start.d:/etc/floci/init/start.d:ro
     networks:
@@ -225,6 +226,8 @@ services:
       API_OAUTH2_SCOPE: read write
       API_TIMEOUT: 5000
       ASPNETCORE_ENVIRONMENT: Development
+      CDP_UPLOADER_URL: http://cdp-uploader:7337
+      CDP_UPLOADER_STUB_ENABLED: false
 
     networks:
       - cdp-tenant
@@ -267,6 +270,36 @@ services:
       - tests
 
 ################################################################################
+
+  cdp-uploader:
+    build:
+      context: ../cdp-uploader
+    ports:
+      - '7337:7337'
+    depends_on:
+      floci:
+        condition: service_healthy
+    links:
+      - 'floci:localstack'
+      - 'redis:redis'
+    env_file:
+      - './lib/epr-register-enrol-frontend/compose/aws.env'
+    environment:
+      PORT: 7337
+      NODE_ENV: development
+      REDIS_HOST: redis
+      USE_SINGLE_INSTANCE_CACHE: true
+      MOCK_VIRUS_SCAN_ENABLED: true
+      MOCK_VIRUS_RESULT_DELAY: 3
+      SQS_ENDPOINT: http://floci:4566
+      S3_ENDPOINT: http://floci:4566
+      SQS_SCAN_RESULTS: http://localhost:4566/000000000000/cdp-clamav-results
+      SQS_SCAN_RESULTS_CALLBACK: http://localhost:4566/000000000000/cdp-uploader-scan-results-callback.fifo
+      SQS_DOWNLOAD_REQUESTS: http://localhost:4566/000000000000/cdp-uploader-download-requests
+      SQS_MOCK_CLAMAV: http://localhost:4566/000000000000/mock-clamav
+      CONSUMER_BUCKETS: epr-register-enrol-file-uploads
+    networks:
+      - cdp-tenant
 
 volumes:
   mongodb-data:
