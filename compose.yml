@@ -99,6 +99,7 @@ services:
       Mongo__DatabaseUri: mongodb://mongodb:27017/
       Mongo__DatabaseName: epr-register-case-management
       WorkItems__SeedOnStartup: "true"
+      NOTIFY_API_KEY: ${NOTIFY_API_KEY}
     networks:
       - cdp-tenant
     develop:
@@ -272,8 +273,7 @@ services:
 ################################################################################
 
   cdp-uploader:
-    build:
-      context: ../cdp-uploader
+    image: defradigital/cdp-uploader:${CDP_UPLOADER_VERSION:-latest}
     ports:
       - '7337:7337'
     depends_on:
