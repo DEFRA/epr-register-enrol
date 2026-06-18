@@ -175,6 +175,8 @@ services:
       Mongo__DatabaseUri: 'mongodb://mongodb:27017/'
       Mongo__DatabaseName: epr
       ASPNETCORE_ENVIRONMENT: Development
+      CdpUploader__Url: http://cdp-uploader:7337
+      App__BaseUrl: http://epr-register-enrol-backend:8080
     depends_on:
       floci:
         condition: service_healthy
@@ -184,6 +186,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      cdp-uploader:
+        condition: service_started
     ports:
       - 8080:8080
     healthcheck:
@@ -297,7 +301,7 @@ services:
       SQS_SCAN_RESULTS_CALLBACK: http://localhost:4566/000000000000/cdp-uploader-scan-results-callback.fifo
       SQS_DOWNLOAD_REQUESTS: http://localhost:4566/000000000000/cdp-uploader-download-requests
       SQS_MOCK_CLAMAV: http://localhost:4566/000000000000/mock-clamav
-      CONSUMER_BUCKETS: epr-register-enrol-file-uploads
+      CONSUMER_BUCKETS: epr-register-enrol-file-uploads,epr-register-enrol-sampling-plans,epr-register-enrol-bes-evidence
     networks:
       - cdp-tenant
 
