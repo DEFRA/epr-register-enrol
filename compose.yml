@@ -177,6 +177,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       CdpUploader__Url: http://cdp-uploader:7337
       App__BaseUrl: http://epr-register-enrol-backend:8080
+      CaseWorkingApi__BaseUrl: http://case-management-backend:8085
     depends_on:
       floci:
         condition: service_healthy
