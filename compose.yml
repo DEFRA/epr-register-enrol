@@ -179,6 +179,9 @@ services:
       App__BaseUrl: http://epr-register-enrol-backend:8080
       CaseWorking__Url: http://case-management-backend:8085
       CaseWorking__UseStub: "false"
+      ReExApi__BaseUrl: ""
+      REEX_API_BASIC_AUTH_USERNAME: ""
+      REEX_API_BASIC_AUTH_PASSWORD: ""
     depends_on:
       floci:
         condition: service_healthy
