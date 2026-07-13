@@ -229,7 +229,7 @@ Stored in MongoDB and returned to the frontend. ManagementBe returns a `workItem
   "payload": {
     "organisationName": "...",
     "registrationNumber": "...",
-    "materialsHandled": ["plastic"],
+    "material": "plastic",
     "accreditationYear": 2025,
     "previousAccreditationYear": 2024,
     "siteAddress": "...",
