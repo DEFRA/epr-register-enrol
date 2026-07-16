@@ -100,6 +100,11 @@ services:
       Mongo__DatabaseName: epr-register-case-management
       WorkItems__SeedOnStartup: "true"
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
+      # RA-227: fake England regulator mailbox so the notification-sent path
+      # works locally. appsettings.Development.json blanks every nation so no
+      # environment defaults to the live Environment Agency inbox; opt back in
+      # with an address that cannot receive mail even if NOTIFY_API_KEY is set.
+      Notify__RegulatorMailboxes__England: regulator-england@example.test
     networks:
       - cdp-tenant
     develop:
