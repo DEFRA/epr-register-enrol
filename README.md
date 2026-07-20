@@ -50,6 +50,14 @@ git submodule update --init --recursive
 
 ## Running locally
 
+Set secrets as environment variables:
+
+```bash
+cp .env.example .env
+```
+
+Edit the .env file, adding secrets as required.
+
 A root [`compose.yml`](compose.yml) brings up all four services plus their
 shared dependencies (MongoDB, Redis, and the Floci AWS emulator) on a single
 Docker network.

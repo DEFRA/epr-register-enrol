@@ -150,6 +150,11 @@ services:
       USE_SINGLE_INSTANCE_CACHE: true
       REDIS_TLS: false
       BACKEND_API_URL: http://case-management-backend:8085
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID_CASE_MANAGEMENT}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET_CASE_MANAGEMENT}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID_CASE_MANAGEMENT}
+      AUTH_STUB_ENABLED: true
+      AUTH_CALLBACK_BASE_URL: http://localhost:5001
     networks:
       - cdp-tenant
     develop:
@@ -173,13 +178,16 @@ services:
 
   epr-register-enrol-backend:
 #    image: defradigital/epr-register-enrol-backend:${EPR_REGISTER_ENROL_BACKEND:-latest}
-    build: ./lib/epr-register-enrol-backend/
+    build:
+      context: ./lib/epr-register-enrol-backend/
+      target: development
     platform: linux/amd64
     links:
     - 'floci:floci'
     - 'mongodb:mongodb'
     environment:
       PORT: 8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       LOCALSTACK_ENDPOINT: 'http://floci:4566'
       Mongo__DatabaseUri: 'mongodb://mongodb:27017/'
       Mongo__DatabaseName: epr
@@ -211,11 +219,25 @@ services:
       retries: 3
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend
+          target: /src/EprRegisterEnrolBackend
+          ignore:
+            - bin/
+            - obj/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend/EprRegisterEnrolBackend.csproj
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend.sln
 
   epr-register-enrol-frontend:
     # image: defradigital/epr-register-enrol-frontend:${EPR_REGISTER_ENROL_FRONTEND:-latest}
     platform: linux/amd64
-    build: ./lib/epr-register-enrol-frontend/
+    build:
+      context: ./lib/epr-register-enrol-frontend/
+      target: development
     ports:
       - '3000:3000'
     links:
@@ -247,9 +269,31 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       CDP_UPLOADER_URL: http://cdp-uploader:7337
       CDP_UPLOADER_STUB_ENABLED: false
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID_FRONTEND}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET_FRONTEND}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID_FRONTEND}
+      AUTH_STUB_ENABLED: true
+      AUTH_CALLBACK_BASE_URL: http://localhost:3000
+      DEFRA_ID_CLIENT_ID: ${DEFRA_ID_CLIENT_ID}
+      DEFRA_ID_CLIENT_SECRET: ${DEFRA_ID_CLIENT_SECRET}
+      DEFRA_ID_DISCOVERY_URL: ${DEFRA_ID_DISCOVERY_URL}
+      DEFRA_ID_SERVICE_ID: ${DEFRA_ID_SERVICE_ID}
 
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-frontend/src
+          target: /home/node/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package-lock.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/webpack.config.js
 
 
 ################################################################################
