@@ -169,13 +169,16 @@ services:
 
   epr-register-enrol-backend:
 #    image: defradigital/epr-register-enrol-backend:${EPR_REGISTER_ENROL_BACKEND:-latest}
-    build: ./lib/epr-register-enrol-backend/
+    build:
+      context: ./lib/epr-register-enrol-backend/
+      target: development
     platform: linux/amd64
     links:
     - 'floci:floci'
     - 'mongodb:mongodb'
     environment:
       PORT: 8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       LOCALSTACK_ENDPOINT: 'http://floci:4566'
       Mongo__DatabaseUri: 'mongodb://mongodb:27017/'
       Mongo__DatabaseName: epr
@@ -207,11 +210,25 @@ services:
       retries: 3
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend
+          target: /src/EprRegisterEnrolBackend
+          ignore:
+            - bin/
+            - obj/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend/EprRegisterEnrolBackend.csproj
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend.sln
 
   epr-register-enrol-frontend:
     # image: defradigital/epr-register-enrol-frontend:${EPR_REGISTER_ENROL_FRONTEND:-latest}
     platform: linux/amd64
-    build: ./lib/epr-register-enrol-frontend/
+    build:
+      context: ./lib/epr-register-enrol-frontend/
+      target: development
     ports:
       - '3000:3000'
     links:
@@ -255,6 +272,19 @@ services:
 
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-frontend/src
+          target: /home/node/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package-lock.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/webpack.config.js
 
 
 ################################################################################
