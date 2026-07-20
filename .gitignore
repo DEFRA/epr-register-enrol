@@ -7,3 +7,4 @@
 .beads.embedded.bak/
 /.vs
 /.claude/settings.json
+.env
