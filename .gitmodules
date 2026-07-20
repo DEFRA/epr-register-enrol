@@ -13,8 +13,6 @@
 [submodule "lib/epr-register-enrol-fe-tests"]
 	path = lib/epr-register-enrol-fe-tests
 	url = git@github.com:DEFRA/epr-register-enrol-fe-tests.git
-	update = none
-
 [submodule "lib/epr-register-enrol-mgmt-tests"]
 	path = lib/epr-register-enrol-mgmt-tests
 	url = git@github.com:DEFRA/epr-register-enrol-mgmt-tests.git
