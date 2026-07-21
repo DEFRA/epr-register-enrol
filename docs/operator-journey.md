@@ -2,6 +2,8 @@
 
 This document describes the full request flow for an operator going through the accreditation application process, covering both development (local) and non-development (deployed) environments.
 
+> This document covers the operator-facing upload side only. For how those files become downloadable from case management, and for the local/CI test infrastructure that makes real uploads work end-to-end, see [`file-download-workflow.md`](./file-download-workflow.md).
+
 ---
 
 ## Architecture Overview
@@ -183,7 +185,7 @@ Browser                    Backend                     CDP Uploader / S3
 - The backend tracks upload state in `PendingUploadService` (in-memory `ConcurrentDictionary`)
 - CDP Uploader rewrites are needed because CDP may return internal Docker hostnames that browsers cannot reach; `CdpUploaderService.RewriteHost()` replaces the host/port with `CdpUploader.Url`
 - Files land in S3 (bucket configured per file type — see config table above)
-- In **development**, `DevScanAutoCompleteService` (hosted service) auto-completes pending uploads by polling CDP's own status URL and calling `PendingUploadService.Complete()`, simulating the callback
+- In **development**, `DevScanAutoCompleteService` (hosted service) polls CDP's real status endpoint (`GetStatusAsync`, via a plain unnamed `HttpClient` — the named `"DefaultClient"` has header-propagation middleware that requires an active HTTP request context and breaks when called from a background service) and calls `PendingUploadService.Complete()` directly in-process once CDP reports `ready`, building the real `s3Key`/`s3Bucket` from the pending upload's tracked `s3Path`/`s3Bucket`/CDP upload id — it does not fabricate file data
 
 ### S3 pre-signed download
 
@@ -239,10 +241,18 @@ Stored in MongoDB and returned to the frontend. ManagementBe returns a `workItem
     "submittedBy": { "fullName": "...", "jobTitle": "...", "email": "..." },
     "prns": { "plannedTonnageBand": "UpTo500", "authorisers": [...] },
     "businessPlan": { "newInfrastructurePercent": 10, ... },
-    "samplingPlan": { "files": [{ "filename": "...", "uploadedAt": "...", "scanStatus": "Clean" }] }
+    "samplingPlan": { "files": [{ "filename": "...", "uploadedAt": "...", "scanStatus": "Clean", "s3Key": "...", "s3Bucket": "..." }] },
+    "overseasSites": {
+      "sites": [{
+        "siteId": 1, "siteName": "...", "siteAddress": "...", "country": "...",
+        "besEvidence": { "files": [{ "filename": "...", "s3Key": "...", "s3Bucket": "..." }] }
+      }]
+    }
   }
 }
 ```
+
+`s3Key`/`s3Bucket` per file are what let case management locate and serve the file for download — see [`file-download-workflow.md`](./file-download-workflow.md). They're sourced from the real CDP status/callback response, not generated locally.
 
 ### Authentication headers
 
