@@ -105,10 +105,7 @@ services:
       # environment defaults to the live Environment Agency inbox; opt back in
       # with an address that cannot receive mail even if NOTIFY_API_KEY is set.
       Notify__RegulatorMailboxes__England: regulator-england@example.test
-      # RA-291 (AC06): operator-service link included in the Queried email.
-      # Points at the local operator frontend so the link in a locally-sent
-      # query notification actually resolves.
-      OperatorService__BaseUrl: http://localhost:3000
+      OPERATOR_SERVICE_BASE_URL: http://localhost:3000
     networks:
       - cdp-tenant
     develop:
