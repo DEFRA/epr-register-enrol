@@ -21,6 +21,7 @@
 services:
   floci:
     image: hectorvent/floci:latest-aws
+    restart: on-failure
     ports:
       - '4566:4566'
     env_file:
@@ -138,6 +139,7 @@ services:
       REDIS_HOST: redis
       LOG_FORMAT: pino-pretty
       SESSION_COOKIE_SECURE: false
+      SESSION_CACHE_NAME: case-mgmt-session
       USE_SINGLE_INSTANCE_CACHE: true
       REDIS_TLS: false
       BACKEND_API_URL: http://case-management-backend:8085
@@ -227,6 +229,7 @@ services:
       NODE_ENV: development
       REDIS_HOST: redis
       LOCALSTACK_ENDPOINT: http://floci:4566
+      SESSION_CACHE_NAME: operator-session
       USE_SINGLE_INSTANCE_CACHE: true
       API_BASE_URL: http://epr-register-enrol-backend:8080
       API_OAUTH2_CLIENT_ID: epr-register-enrol-frontend
