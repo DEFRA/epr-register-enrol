@@ -101,6 +101,8 @@ services:
       Mongo__DatabaseName: epr-register-case-management
       WorkItems__SeedOnStartup: "true"
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
+      Notify__RegulatorMailboxes__England: regulator-england@example.test
+      OPERATOR_SERVICE_BASE_URL: http://localhost:3000
     networks:
       - cdp-tenant
     develop:
