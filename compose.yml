@@ -103,6 +103,11 @@ services:
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
       Notify__RegulatorMailboxes__England: regulator-england@example.test
       OPERATOR_SERVICE_BASE_URL: http://localhost:3000
+      OperatorBackendApi__Enabled: "true" 
+      OperatorBackendApi__URL: "http://epr-register-enrol-backend:8080"
+      OperatorBackendApi__SharedSecret: "local-dev-secret"
+      
+      
     networks:
       - cdp-tenant
     develop:
