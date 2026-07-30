@@ -153,8 +153,13 @@ services:
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID_CASE_MANAGEMENT}
       ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET_CASE_MANAGEMENT}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID_CASE_MANAGEMENT}
-      ENTRA_REGULATOR_ROLE_VALUE: ${ENTRA_REGULATOR_ROLE_VALUE_CASE_MANAGEMENT}
-      ENTRA_SUPPORT_USER_ROLE_VALUE: ${ENTRA_SUPPORT_USER_ROLE_VALUE_CASE_MANAGEMENT}
+      # Fall back to the app's own convict defaults (config.js) when unset in
+      # .env — Compose sets the var to an EMPTY STRING otherwise (not
+      # "unset"), which silently overrides the app default and breaks the
+      # real Entra ID role check for every local dev who hasn't customised
+      # these two vars.
+      ENTRA_REGULATOR_ROLE_VALUE: ${ENTRA_REGULATOR_ROLE_VALUE_CASE_MANAGEMENT:-Waste.Regulator.Standard}
+      ENTRA_SUPPORT_USER_ROLE_VALUE: ${ENTRA_SUPPORT_USER_ROLE_VALUE_CASE_MANAGEMENT:-Waste.SupportUser.ReadOnly}
       AUTH_STUB_ENABLED: true
       AUTH_CALLBACK_BASE_URL: http://localhost:5001
     networks:
