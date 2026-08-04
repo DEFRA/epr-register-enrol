@@ -99,6 +99,12 @@ services:
       Mongo__DatabaseUri: mongodb://mongodb:27017/
       Mongo__DatabaseName: epr-register-case-management
       WorkItems__SeedOnStartup: "true"
+      # No email leaves this stack: ASPNETCORE_ENVIRONMENT=Development above
+      # makes NotifySendingPolicy register the no-op Notify client, key or no
+      # key. Sends are logged and audited as sent, nothing reaches Notify —
+      # which matters because the non-production Notify team key has used up
+      # its five guest-address slots and a send to anything else fails in the
+      # case-management UI. Set Notify__SendEmails=true to opt back in.
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
       # RA-227: fake England regulator mailbox so the notification-sent path
       # works locally. appsettings.Development.json blanks every nation so no
