@@ -265,9 +265,16 @@ Stored in MongoDB and returned to the frontend. ManagementBe returns a `workItem
 | `x-cdp-auth-timestamp` | `yyyy-MM-ddTHH:mm:ssZ` | Only if `SharedSecret` set |
 | `x-cdp-auth-nonce` | 16 random bytes, base64 | Only if `SharedSecret` set |
 
-HMAC canonical payload (v2 — must stay in sync with ManagementBe):
+`CaseWorking.SharedSecret` (this service's own outbound secret, unaffected
+by the change below) must match `AUTH_SHARED_SECRET__BACKEND` on
+ManagementBe specifically — ManagementBe verifies each caller against its
+own per-caller secret rather than one value shared with `management-fe`
+(RA-345; see `epr-register-enrol-management-be`'s
+`docs/adr/0006-per-caller-client-secrets.md`).
+
+HMAC canonical payload (v3 — must stay in sync with ManagementBe):
 ```
-v2\n{clientId}\n{userId}\n{userName}\n{userRoles}\n{timestamp}\n{nonce}
+v3\n{clientId}\n{userId}\n{userName}\n{timestamp}\n{nonce}
 ```
 
 ---
