@@ -88,7 +88,7 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe
 | `S3.PresignedUrlExpirySeconds` | `300` | Pre-signed URL TTL |
 | `CaseWorking.Url` | `http://localhost:8085` | `CaseWorking__Url` env var |
 | `CaseWorking.UseStub` | `true` | `CaseWorking__UseStub=false` |
-| `CaseWorking.CognitoClientId` | `epr-register-enrol-backend` | — |
+| `CaseWorking.ClientId` | `epr-register-enrol-backend` | — |
 | `CaseWorking.SharedSecret` | `null` | Set to enable HMAC auth headers. Sourced from the flat `CASE_MANAGEMENT_API_SHARED_SECRET` env var (CDP secrets convention), not `CaseWorking__SharedSecret` — RA-345. |
 
 > **ReEx URL in development:** `ReExApi.BaseUrl` is blank in all committed configs. This is safe because the DI environment branch registers `StubReExApiAdapter`, which never calls `IReExClient`. The URL must be injected at deployment via `ReExApi__BaseUrl`.
@@ -258,7 +258,7 @@ Stored in MongoDB and returned to the frontend. ManagementBe returns a `workItem
 
 | Header | Value | Condition |
 |--------|-------|-----------|
-| `x-cdp-cognito-client-id` | `CaseWorking.CognitoClientId` | Always |
+| `x-cdp-client-id` | `CaseWorking.ClientId` | Always |
 | `x-cdp-user-id` | Submitter email (fallback: `organisationId`) | If present |
 | `x-cdp-user-name` | Submitter full name | If present |
 | `x-cdp-auth-signature` | HMAC-SHA256 of canonical payload | Only if `SharedSecret` set |
@@ -479,7 +479,7 @@ Frontend enforces route-level scopes:
 options: requireOperator  // auth.scope: ['operator']
 ```
 
-The backend trusts the authenticated identity forwarded by the frontend. ReEx auth (`BasicAuthHandler`) and ManagementBe auth (Cognito headers + optional HMAC) are handled transparently by the respective adapters.
+The backend trusts the authenticated identity forwarded by the frontend. ReEx auth (`BasicAuthHandler`) and ManagementBe auth (client-id header + optional HMAC) are handled transparently by the respective adapters.
 
 ---
 
