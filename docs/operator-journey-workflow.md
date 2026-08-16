@@ -100,6 +100,7 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | `CaseWorking.SharedSecret` | `null` | Set to enable HMAC auth headers. Sourced from the flat `CASE_MANAGEMENT_API_SHARED_SECRET` env var (CDP secrets convention), not `CaseWorking__SharedSecret` — RA-345. |
 | `CaseManagementAuth.ExpectedCognitoClientId` | `epr-register-enrol-management-be` | — |
 | `CaseManagementAuth.SharedSecret` | `null` | Verifies inbound HMAC on CM's push endpoints (RA-368 §5). Sourced from the flat `AUTH_SHARED_SECRET__MANAGEMENT_BE` env var, looked up via its config-key colon form `AUTH_SHARED_SECRET:MANAGEMENT_BE` — not a nested `CaseManagementAuth__*` key. Must match CM's own outbound secret, sourced there from the flat `OPERATOR_BACKEND_SHARED_SECRET` env var. |
+| `FrontendAuthConfig.SharedSecret` | `null` | Static shared secret required (outside Development) to call the ReEx-backed organisation endpoints, e.g. `GET /api/v1/organisations/{organisationId}/defra-link`. Sourced from the flat `AUTH_SHARED_SECRET__FRONTEND` env var, not a nested key. Must match `AUTH_SHARED_SECRET__BACKEND` on `epr-register-enrol-frontend` exactly — the frontend sends it as `Authorization: Bearer <secret>` on every backend call (`src/server/common/api-client.js`). |
 
 > **ReEx URL in development:** `ReExApi.BaseUrl` is blank in all committed configs. This is safe because the DI environment branch registers `StubReExApiAdapter`, which never calls `IReExClient`. The URL must be injected at deployment via `ReExApi__BaseUrl`.
 
