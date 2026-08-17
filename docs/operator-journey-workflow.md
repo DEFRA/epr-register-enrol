@@ -43,7 +43,7 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | MongoDB | Backend ↔ MongoDB | Every request — read/write application state | `IAccreditationApplicationPersistence` |
 | ReEx API | Backend → ReEx | Seed (Step 2), overseas sites (Step 5) | `IReExClient` via `IReExApiAdapter` |
 | CDP Uploader | Backend → CDP, CDP → Backend (webhook) | File upload initiation and scan callback (Steps 4, 6) | `ICdpUploaderService` |
-| S3 | Backend → S3 | Pre-signed download URL generation | `IS3Service` |
+| S3 | Backend → S3 | Pre-signed download URL generation | `IS3Service` — **removal pending #107**, currently still live on `main` |
 | ManagementBe | Backend → ManagementBe | Submit (Step 7), withdraw (Step 10) | `ICaseWorkingApiAdapter` |
 | ManagementBe | ManagementBe → Backend (push) | Any CM work-item status change (RA-368) or query raised (RA-311) | `CaseManagementAuthenticationHandler` (inbound HMAC auth) |
 
@@ -59,7 +59,7 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | ReEx auth | N/A | HTTP Basic Auth via `REEX_API_BASIC_AUTH_*` env vars |
 | MongoDB | `mongodb://127.0.0.1:27017` | Remote Atlas (AWS IAM auth) |
 | CDP Uploader | `http://localhost:7337` | `CdpUploader__Url` env var |
-| S3 | LocalStack `http://localhost:4566` | AWS S3 (`S3__Endpoint` env var) |
+| S3 | LocalStack `http://localhost:4566` | AWS S3 (`S3__Endpoint` env var) — **removal pending #107** |
 | Case Working adapter | `HttpCaseWorkingApiAdapter` → `localhost:8085` | `HttpCaseWorkingApiAdapter` → configured URL |
 | Case Working stub | `UseStub=false` in dev appsettings | Must set `CaseWorking__UseStub=false` at deploy |
 
@@ -96,7 +96,7 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | `CaseWorking.SharedSecret` | `null` | Set to enable HMAC auth headers. Sourced from the flat `CASE_MANAGEMENT_API_SHARED_SECRET` env var (CDP secrets convention), not `CaseWorking__SharedSecret` — RA-345. |
 | `CaseManagementAuth.ExpectedCognitoClientId` | `epr-register-enrol-management-be` | — |
 | `CaseManagementAuth.SharedSecret` | `null` | Verifies inbound HMAC on CM's push endpoints (RA-368 §5). Sourced from the flat `AUTH_SHARED_SECRET__MANAGEMENT_BE` env var, looked up via its config-key colon form `AUTH_SHARED_SECRET:MANAGEMENT_BE` — not a nested `CaseManagementAuth__*` key. Must match CM's own outbound secret, sourced there from the flat `OPERATOR_BACKEND_SHARED_SECRET` env var. |
-| `FrontendAuthConfig.SharedSecret` | `null` | Static shared secret required (outside Development) to call the ReEx-backed organisation endpoints, e.g. `GET /api/v1/organisations/{organisationId}/defra-link`. Sourced from the flat `AUTH_SHARED_SECRET__FRONTEND` env var, not a nested key. Must match `AUTH_SHARED_SECRET__BACKEND` on `epr-register-enrol-frontend` exactly — the frontend sends it as `Authorization: Bearer <secret>` on every backend call (`src/server/common/api-client.js`). |
+| `FrontendAuthConfig.SharedSecret` | `null` | **Enforcement pending #106** — on `main` today, neither `defra-link` nor any `AccreditationApplicationEndpoints` route has an auth scheme attached. Once #106 merges, this static shared secret will be required (outside Development) on the ReEx-backed organisation endpoints (`GET /api/v1/organisations/{organisationId}/defra-link`) *and* nearly the entire `/api/v1/accreditation-applications/*` surface — seed/get/patch/submit/resubmit/withdraw/file management — everything except the two `case-management/*` routes (CaseManagement-authenticated instead) and `files/upload-completed` (the CDP Uploader webhook, deliberately left open). Sourced from the flat `AUTH_SHARED_SECRET__FRONTEND` env var, not a nested key. Must match `AUTH_SHARED_SECRET__BACKEND` on `epr-register-enrol-frontend` exactly — the frontend sends it as `Authorization: Bearer <secret>` on every backend call (`src/server/common/api-client.js`). |
 
 > **ReEx URL in development:** `ReExApi.BaseUrl` is blank in all committed configs. This is safe because the DI environment branch registers `StubReExApiAdapter`, which never calls `IReExClient`. The URL must be injected at deployment via `ReExApi__BaseUrl`.
 
@@ -107,6 +107,10 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 Two independent switches control adapter selection:
 
 ### ReEx — environment-driven (`IsDevelopment()`)
+
+**Pending #107** — shown below is the state after #107 merges. On `main` today this block still
+also registers `OrganisationPersistence`/`FallbackOrganisationPersistence` behind
+`IOrganisationPersistence`, backing the still-live Mongo-backed `/organisation` endpoint group.
 
 ```csharp
 if (builder.Environment.IsDevelopment())
@@ -122,10 +126,8 @@ else
 ```
 
 `FakeOrganisationPersistence` is `StubReExApiAdapter`'s own fixture data (constructor-injected as a
-concrete type, not behind an interface) — there's no separate organisation persistence layer or
-Mongo-backed `/organisation` endpoint any more. That existed at one point but had no live reader
-anywhere in the monorepo once `ReExOrganisationEndpoints` (live ReEx lookups) superseded it; removed
-as dead code.
+concrete type, not behind an interface) and is unaffected by #107 — it survives regardless, since
+it was never part of the `IOrganisationPersistence`/`/organisation` endpoint story being removed.
 
 `IReExClient` (`ReExClient`) is **always** registered via `AddReExClients()` regardless of environment.
 
@@ -204,12 +206,20 @@ Browser                    Backend                     CDP Uploader / S3
 - Files land in S3 (bucket configured per file type)
 - In **development**, `DevScanAutoCompleteService` (hosted service) polls CDP's real status endpoint (`GetStatusAsync`, via a plain unnamed `HttpClient` — the named `"DefaultClient"` has header-propagation middleware that requires an active HTTP request context and breaks when called from a background service) and calls `PendingUploadService.Complete()` directly in-process once CDP reports `ready`, building the real `s3Key`/`s3Bucket` from the pending upload's tracked `s3Path`/`s3Bucket`/CDP upload id — it does not fabricate file data
 
-> A separate, unauthenticated `/api/v1/file-uploads/*` endpoint group and its own Mongo-backed
-> `IFileUploadPersistence`/`S3Config`/`IS3Service` (including a pre-signed-download route) existed
+> **Pending #107** (still live on `main` today): a separate, unauthenticated
+> `/api/v1/file-uploads/*` endpoint group and its own Mongo-backed
+> `IFileUploadPersistence`/`S3Config`/`IS3Service` (including a pre-signed-download route) exist
 > alongside the flow above with no live caller anywhere in the monorepo — an earlier
-> CDP-uploader-brokering design superseded by the embedded-file model shown here. Removed as dead
-> code (along with the equally-uncalled Mongo-backed `/organisation` CRUD group) rather than
-> secured, since securing unused endpoints adds no value.
+> CDP-uploader-brokering design superseded by the embedded-file model shown here. #107 removes it
+> as dead code rather than securing it, since securing unused endpoints adds no value.
+>
+> The Mongo-backed `/organisation` CRUD group (`FileUpload/**`'s neighbour, also removed in #107)
+> is a related but separate story: the frontend's `persistentStubApiClient` genuinely did call
+> three of its routes (`GetAll`/`GetByOrgId`/`Upsert`) to write-through stub org data — a caller
+> an earlier draft of #107 missed entirely. That write-through has since been traced to have no
+> reader of its own anywhere (see DEFRA/epr-register-enrol-frontend#245 and
+> DEFRA/epr-register-enrol-fe-tests#81, which remove it and a dead test helper that looked like it
+> might be one), which is what makes deleting the endpoint safe rather than merely convenient.
 
 ---
 
@@ -346,6 +356,12 @@ Authenticated the same way as the outbound calls above, verified against
 ## Backend API Endpoints
 
 ### Accreditation Applications — `/api/v1/accreditation-applications`
+
+> **Auth status — pending #106:** every route below except the two `case-management/*`
+> rows requires `FrontendAuthenticationHandler` (`Authorization: Bearer <secret>`, see
+> `FrontendAuthConfig.SharedSecret` above) once #106 merges — not just `defra-link`, as an
+> earlier version of this doc implied. `files/upload-completed` is the one deliberate
+> exception (the CDP Uploader webhook has no way to send that secret).
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -601,6 +617,10 @@ The backend trusts the authenticated identity forwarded by the frontend. ReEx au
 ---
 
 ## Backend Project Structure
+
+> Reflects the state after #106 and #107 merge — `FileUpload/`, `OrganisationEndpoints.cs`, and
+> `OrganisationPersistence.cs`/`FallbackOrganisationPersistence.cs` (#107) still exist on `main`
+> today, and no auth scheme is attached to any route below yet (#106).
 
 ```
 EprRegisterEnrolBackend/
