@@ -43,7 +43,6 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | MongoDB | Backend ↔ MongoDB | Every request — read/write application state | `IAccreditationApplicationPersistence` |
 | ReEx API | Backend → ReEx | Seed (Step 2), overseas sites (Step 5) | `IReExClient` via `IReExApiAdapter` |
 | CDP Uploader | Backend → CDP, CDP → Backend (webhook) | File upload initiation and scan callback (Steps 4, 6) | `ICdpUploaderService` |
-| S3 | Backend → S3 | Pre-signed download URL generation | `IS3Service` — **removal pending #107**, currently still live on `main` |
 | ManagementBe | Backend → ManagementBe | Submit (Step 7), withdraw (Step 10) | `ICaseWorkingApiAdapter` |
 | ManagementBe | ManagementBe → Backend (push) | Any CM work-item status change (RA-368) or query raised (RA-311) | `CaseManagementAuthenticationHandler` (inbound HMAC auth) |
 
@@ -59,7 +58,6 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | ReEx auth | N/A | HTTP Basic Auth via `REEX_API_BASIC_AUTH_*` env vars |
 | MongoDB | `mongodb://127.0.0.1:27017` | Remote Atlas (AWS IAM auth) |
 | CDP Uploader | `http://localhost:7337` | `CdpUploader__Url` env var |
-| S3 | LocalStack `http://localhost:4566` | AWS S3 (`S3__Endpoint` env var) — **removal pending #107** |
 | Case Working adapter | `HttpCaseWorkingApiAdapter` → `localhost:8085` | `HttpCaseWorkingApiAdapter` → configured URL |
 | Case Working stub | `UseStub=false` in dev appsettings | Must set `CaseWorking__UseStub=false` at deploy |
 
@@ -108,10 +106,6 @@ Two independent switches control adapter selection:
 
 ### ReEx — environment-driven (`IsDevelopment()`)
 
-**Pending #107** — shown below is the state after #107 merges. On `main` today this block still
-also registers `OrganisationPersistence`/`FallbackOrganisationPersistence` behind
-`IOrganisationPersistence`, backing the still-live Mongo-backed `/organisation` endpoint group.
-
 ```csharp
 if (builder.Environment.IsDevelopment())
 {
@@ -126,8 +120,8 @@ else
 ```
 
 `FakeOrganisationPersistence` is `StubReExApiAdapter`'s own fixture data (constructor-injected as a
-concrete type, not behind an interface) and is unaffected by #107 — it survives regardless, since
-it was never part of the `IOrganisationPersistence`/`/organisation` endpoint story being removed.
+concrete type, not behind an interface) — it was never part of the `IOrganisationPersistence`/
+`/organisation` endpoint group that #107 removed.
 
 `IReExClient` (`ReExClient`) is **always** registered via `AddReExClients()` regardless of environment.
 
@@ -206,20 +200,21 @@ Browser                    Backend                     CDP Uploader / S3
 - Files land in S3 (bucket configured per file type)
 - In **development**, `DevScanAutoCompleteService` (hosted service) polls CDP's real status endpoint (`GetStatusAsync`, via a plain unnamed `HttpClient` — the named `"DefaultClient"` has header-propagation middleware that requires an active HTTP request context and breaks when called from a background service) and calls `PendingUploadService.Complete()` directly in-process once CDP reports `ready`, building the real `s3Key`/`s3Bucket` from the pending upload's tracked `s3Path`/`s3Bucket`/CDP upload id — it does not fabricate file data
 
-> **Pending #107** (still live on `main` today): a separate, unauthenticated
-> `/api/v1/file-uploads/*` endpoint group and its own Mongo-backed
-> `IFileUploadPersistence`/`S3Config`/`IS3Service` (including a pre-signed-download route) exist
-> alongside the flow above with no live caller anywhere in the monorepo — an earlier
-> CDP-uploader-brokering design superseded by the embedded-file model shown here. #107 removes it
-> as dead code rather than securing it, since securing unused endpoints adds no value.
+> **#107 removed two dead endpoint groups** that used to sit alongside the flow above:
+>
+> A separate, unauthenticated `/api/v1/file-uploads/*` endpoint group and its own Mongo-backed
+> `IFileUploadPersistence`/`S3Config`/`IS3Service` (including a pre-signed-download route) — an
+> earlier CDP-uploader-brokering design superseded by the embedded-file model shown here, with no
+> live caller anywhere in the monorepo. #107 removed it as dead code rather than securing it,
+> since securing unused endpoints adds no value.
 >
 > The Mongo-backed `/organisation` CRUD group (`FileUpload/**`'s neighbour, also removed in #107)
 > is a related but separate story: the frontend's `persistentStubApiClient` genuinely did call
 > three of its routes (`GetAll`/`GetByOrgId`/`Upsert`) to write-through stub org data — a caller
-> an earlier draft of #107 missed entirely. That write-through has since been traced to have no
-> reader of its own anywhere (see DEFRA/epr-register-enrol-frontend#245 and
-> DEFRA/epr-register-enrol-fe-tests#81, which remove it and a dead test helper that looked like it
-> might be one), which is what makes deleting the endpoint safe rather than merely convenient.
+> an earlier draft of #107 missed entirely. That write-through was traced to have no reader of
+> its own anywhere (see DEFRA/epr-register-enrol-frontend#245 and
+> DEFRA/epr-register-enrol-fe-tests#81, which removed it and a dead test helper that looked like it
+> might be one), which is what made deleting the endpoint safe rather than merely convenient.
 
 ---
 
@@ -618,9 +613,9 @@ The backend trusts the authenticated identity forwarded by the frontend. ReEx au
 
 ## Backend Project Structure
 
-> Reflects the state after #106 and #107 merge — `FileUpload/`, `OrganisationEndpoints.cs`, and
-> `OrganisationPersistence.cs`/`FallbackOrganisationPersistence.cs` (#107) still exist on `main`
-> today, and no auth scheme is attached to any route below yet (#106).
+> Reflects the current state of `main`: #107 merged, so `FileUpload/`, `OrganisationEndpoints.cs`,
+> and `OrganisationPersistence.cs`/`FallbackOrganisationPersistence.cs` are already gone. #106
+> (auth enforcement) is still open — no auth scheme is attached to any route below yet.
 
 ```
 EprRegisterEnrolBackend/
