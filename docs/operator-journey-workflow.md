@@ -58,7 +58,6 @@ MongoDB      ReEx API    CDP Uploader   ManagementBe (CM) │
 | ReEx adapter | `StubReExApiAdapter` | `HttpReExApiAdapter` |
 | ReEx auth | N/A | HTTP Basic Auth via `REEX_API_BASIC_AUTH_*` env vars |
 | MongoDB | `mongodb://127.0.0.1:27017` | Remote Atlas (AWS IAM auth) |
-| Organisation data | `FakeOrganisationPersistence` fallback | `OrganisationPersistence` (MongoDB) |
 | CDP Uploader | `http://localhost:7337` | `CdpUploader__Url` env var |
 | S3 | LocalStack `http://localhost:4566` | AWS S3 (`S3__Endpoint` env var) |
 | Case Working adapter | `HttpCaseWorkingApiAdapter` → `localhost:8085` | `HttpCaseWorkingApiAdapter` → configured URL |
@@ -113,15 +112,20 @@ Two independent switches control adapter selection:
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IReExApiAdapter, StubReExApiAdapter>();
-    builder.Services.AddSingleton<IOrganisationPersistence, FallbackOrganisationPersistence>();
-    // also registers FakeOrganisationPersistence, StubApplicationPersistence, DevScanAutoCompleteService
+    builder.Services.AddSingleton<FakeOrganisationPersistence>();
+    // also registers StubApplicationPersistence, DevScanAutoCompleteService
 }
 else
 {
     builder.Services.AddSingleton<IReExApiAdapter, HttpReExApiAdapter>();
-    builder.Services.AddSingleton<IOrganisationPersistence, OrganisationPersistence>();
 }
 ```
+
+`FakeOrganisationPersistence` is `StubReExApiAdapter`'s own fixture data (constructor-injected as a
+concrete type, not behind an interface) — there's no separate organisation persistence layer or
+Mongo-backed `/organisation` endpoint any more. That existed at one point but had no live reader
+anywhere in the monorepo once `ReExOrganisationEndpoints` (live ReEx lookups) superseded it; removed
+as dead code.
 
 `IReExClient` (`ReExClient`) is **always** registered via `AddReExClients()` regardless of environment.
 
