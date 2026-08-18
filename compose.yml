@@ -64,19 +64,6 @@ services:
       retries: 3
       start_period: 30s
 
-
-  mongodb-init:
-    build:
-      context: ./lib/epr-register-enrol-backend/
-      dockerfile: Dockerfile.init
-    depends_on:
-      mongodb:
-        condition: service_started
-    environment:
-      MONGO_URL: mongodb://mongodb:27017
-    networks:
-      - cdp-tenant
-
   ################################################################################
 
   case-management-backend:
@@ -211,8 +198,6 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_started
-      mongodb-init:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
       cdp-uploader:
