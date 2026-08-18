@@ -330,6 +330,7 @@ services:
 
   cdp-uploader:
     image: defradigital/cdp-uploader:${CDP_UPLOADER_VERSION:-latest}
+    platform: linux/amd64
     ports:
       - '7337:7337'
     depends_on:
