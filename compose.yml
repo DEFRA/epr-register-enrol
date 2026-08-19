@@ -253,12 +253,8 @@ services:
       SESSION_CACHE_NAME: operator-session
       USE_SINGLE_INSTANCE_CACHE: true
       API_BASE_URL: http://epr-register-enrol-backend:8080
-      API_OAUTH2_CLIENT_ID: epr-register-enrol-frontend
       API_STUB_ENABLED: false
       REGULATOR_QUERY_TEXT_DISABLED: true
-      API_OAUTH2_CLIENT_SECRET: 2c6e43f5-9a3c-4559-863a-741d2fcda42b
-      API_OAUTH2_TOKEN_URL: http://epr-register-enrol-backend:8080/token
-      API_OAUTH2_SCOPE: read write
       API_TIMEOUT: 5000
       ASPNETCORE_ENVIRONMENT: Development
       CDP_UPLOADER_URL: http://cdp-uploader:7337
