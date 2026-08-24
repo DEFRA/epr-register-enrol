@@ -268,6 +268,11 @@ services:
       DEFRA_ID_CLIENT_SECRET: ${DEFRA_ID_CLIENT_SECRET}
       DEFRA_ID_DISCOVERY_URL: ${DEFRA_ID_DISCOVERY_URL}
       DEFRA_ID_SERVICE_ID: ${DEFRA_ID_SERVICE_ID}
+      # RA-459: unconditionally required now — the fallback destination for
+      # the accreditation session-expiry redirect and the task list's
+      # save-and-come-back-later link, both of which used to point at
+      # /operator (now test-only, gated by TEST_PAGES_DISABLED).
+      REEX_FRONTEND_BASE_URL: https://epr-frontend.dev.cdp-int.defra.cloud
 
     networks:
       - cdp-tenant
