@@ -547,6 +547,158 @@ Ordinals: `plannedTonnageBand` 0 = UpTo500, 1 = UpTo5000, 2 = UpTo10000, 3 = Ove
 `scanStatus` 0 = Pending, 1 = Clean, 2 = Infected · `documentType` 0 = SamplingPlan, 1 = SupportingEvidence.
 The API (JSON) exposes these as names; only Mongo holds the ints. Section 2a shows the names.
 
+## 2c. Sample document (exporter, status `Rejected`)
+
+A second stored document (mongosh notation, perf-test environment), this time an **exporter** whose application was
+refused in Case Management. It shows the exporter-only fields (`overseasSites`, `besEvidence`) that the reprocessor in
+section 2b lacks. It is the CM counterpart of the exporter in the CM model, section 2c (`caseManagementWorkItemId`
+points at that work item). Repeated blocks are abbreviated (marked `/* … */`).
+
+```js
+{
+  _id: ObjectId('6ac8b365d027450b4bfa20b3'),
+  organisationId: '61002',
+  orgId: NumberInt('61002'),
+  organisationName: 'PerfTest Exporter 002',
+  year: NumberInt('2027'),
+  registrationId: 'aaa000000000000000061002',
+  isExporter: true,
+  nation: 'Scotland',
+  companyRegisterAddressPostcode: 'EH1 1AA',
+  companyRegisteredAddress: 'Export House 2, Edinburgh, EH1 1AA',
+  isUkRegisteredAddress: false,
+  companiesHouseNumber: 'PERF61002',
+  permitNumbers: [ 'WML61002' ],
+  wasteProcessingType: 'exporter',
+  materialType: 'Glass',
+  applicationStatus: 'Rejected',                              // string
+  sourceReExAccreditationId: 'reex-acc-61002-Glass-2026',
+  sourceYear: NumberInt('2026'),
+  applicationReference: 'AP27SE0610021AAGL',
+  paymentReference: 'E800 81581/61002',
+  caseManagementWorkItemId: UUID('a0da8b3a-a2e9-4dd0-84e0-92cc146f2569'),   // BSON UUID here, plain string in the CM
+  registrationReference: 'PERF-61002',
+  previousRegistrationNumbers: [],
+  previousAccreditationNumbers: [],
+  submittedBy: { fullName: 'John Smith', jobTitle: 'Director', email: 'test@defra.gov.uk' },
+  submitterContactDetails: { fullName: 'Stub Submitter', email: 'stub.submitter@example.com', phone: '01234 567890', jobTitle: 'Stub Job Title' },
+  dateSent: ISODate('2026-10-09T09:33:05.474Z'),
+  caseManagementStatusUpdatedAt: ISODate('2026-10-09T09:42:00.672Z'),
+  dateLastEdited: ISODate('2026-10-09T09:42:00.682Z'),
+  createdAt: ISODate('2026-10-09T09:27:01.980Z'),
+  updatedAt: ISODate('2026-10-09T09:42:00.682Z'),
+  version: NumberLong('20'),
+  prns: {
+    plannedTonnageBand: NumberInt('0'),                       // ordinal: 0 = UpTo500
+    authorisers: [ { fullName: 'Stub Authoriser', email: 'stub@example.com', isNew: false } ],
+    sectionStatus: NumberInt('2'),                            // 2 = Completed
+    versions: [
+      { plannedTonnageBand: NumberInt('0'), authorisers: [ /* as above */ ], versionedAt: ISODate('2026-10-09T09:33:05.474Z') }
+    ]
+  },
+  businessPlan: {
+    newInfrastructurePercent: NumberInt('20'), priceSupportPercent: NumberInt('20'),
+    businessCollectionsPercent: NumberInt('15'), communicationsPercent: NumberInt('15'),
+    newMarketsPercent: NumberInt('10'), newUsesPercent: NumberInt('10'), otherPercent: NumberInt('10'),
+    newInfrastructureDetail: 'q', priceSupportDetail: 'q', businessCollectionsDetail: 'q',
+    communicationsDetail: 'q', newMarketsDetail: 'q', newUsesDetail: 'q', otherDetail: 'q',
+    sectionStatus: NumberInt('2'),
+    versions: [ { /* same fields as above */ versionedAt: ISODate('2026-10-09T09:33:05.474Z') } ]
+  },
+  samplingPlan: {
+    files: [
+      {
+        fileId: '287f3c58-d6ce-42e5-b08c-eb3777cbb039',
+        filename: 'image.png',
+        contentType: 'image/png',
+        uploadedAt: ISODate('2026-10-09T09:28:06.888Z'),
+        uploadedByUserId: '',
+        scanStatus: NumberInt('1'),                           // 1 = Clean
+        documentType: NumberInt('0'),                         // 0 = SamplingPlan
+        s3Key: 'sampling-plans/accreditation/sampling-plan/6ac8b365d027450b4bfa20b3/f7c25286-…/287f3c58-…',
+        s3Bucket: 'epr-register-enrol-file-uploads'
+      }
+    ],
+    sectionStatus: NumberInt('2'),
+    versions: [ { files: [ /* same file entry */ ], versionedAt: ISODate('2026-10-09T09:33:05.474Z') } ]
+  },
+  overseasSites: {
+    sites: [
+      {
+        // Site 1: fully populated, carries a previous-year snapshot and an interim site
+        siteId: NumberInt('96100201'), orsId: '001',
+        siteName: 'Overseas Site 1 (Germany)',
+        siteAddress: '1 Hannover street, Hannover, Germany',
+        addressLine1: '1 Hannover street', addressLine2: '', townOrCity: 'Hannover', country: 'Germany',
+        coordinates: '51.5034, -0.1275',
+        contactName: 'John Smith', contactEmail: 'm@example.com', contactPhone: '',
+        operationCodes: [ 'R5' ], code1: 'A1090', repatriatedLoads: 'wer',
+        isEu: true, isOecd: true, selected: true, isNewSite: false, registeredNowAccredited: false,
+        previousSites: [
+          // last year's version of the site, as seeded from ReEx
+          { siteId: NumberInt('96100201'), orsId: '001', siteName: 'Overseas Site 1 (Germany)', siteAddress: 'Address 96100201',
+            country: 'Germany', operationCodes: [], isEu: true, isOecd: true, selected: true,
+            isNewSite: false, registeredNowAccredited: false, previousSites: [], interimSites: [] }
+        ],
+        interimSite: {
+          siteId: NumberInt('96100205'), siteNumber: '001', country: 'Germany',
+          siteName: 'Overseas Site 1 Interim Site 1  (Germany)',
+          addressLine1: '1 Bellefield Road', addressLine2: '', townOrCity: 'Bellefield',
+          stateOrRegion: '', postcode: '',
+          contactName: 'John Smith', contactEmail: 'm@example.com', contactPhone: '+447961360044',
+          operationCodes: [ 'R12', 'R13' ],
+          isNewSite: true,
+          createdAt: ISODate('2026-10-09T09:31:42.089Z')
+        },
+        interimSites: [ /* same entry as interimSite */ ]
+      },
+      { siteId: NumberInt('96100202'), orsId: '002', siteName: 'Overseas Site 2 (France)', country: 'France', isEu: true,  isOecd: true,  /* minimal: previousSites: [], interimSites: [] */ },
+      { siteId: NumberInt('96100203'), orsId: '003', siteName: 'Overseas Site 3 (Japan)',  country: 'Japan',  isEu: false, isOecd: true,  /* as above */ },
+      {
+        // Site 4: non-EU and non-OECD, so BES evidence is required
+        siteId: NumberInt('96100204'), orsId: '004', siteName: 'Overseas Site 4 (Vietnam)',
+        country: 'Vietnam', isEu: false, isOecd: false, /* … */
+        besEvidence: {
+          besEvidenceUploads: [
+            {
+              fileId: '3fb11116-1cc1-4ec2-a387-2fdbd1772f08',
+              filename: 'screens-1.png',
+              contentType: 'image/png',
+              scanStatus: 'Clean',                            // string here, int in samplingPlan files
+              besEvidenceValidFromDate: '2026-11-11T00:00:00.000Z',
+              uploadedAt: ISODate('2026-10-09T09:32:39.145Z'),
+              s3Key: 'bes-evidence/accreditation/bes-evidence/6ac8b365d027450b4bfa20b3/96100204/4e4f0f0a-…/3fb11116-…',
+              s3Bucket: 'epr-register-enrol-file-uploads'
+            }
+          ],
+          doYouWantToUploadMoreEvidence: false
+        }
+      }
+      // every site also carries selected: true, isNewSite: false, registeredNowAccredited: false
+    ],
+    sectionStatus: NumberInt('2'),
+    versions: [ { sites: [ /* full copy of the sites above */ ], versionedAt: ISODate('2026-10-09T09:33:05.474Z') } ]
+  },
+  besEvidence: {
+    // top-level section holds status and history only; the evidence itself sits on each overseas site
+    sectionStatus: NumberInt('2'),
+    versions: [ { versionedAt: ISODate('2026-10-09T09:33:05.474Z') } ]
+  }
+}
+```
+
+**Observations from this sample**
+
+| Observation | Detail |
+| --- | --- |
+| Exporter-only sections | `overseasSites` and the top-level `besEvidence` are present. `siteAddress` and `glassRecyclingProcess` (reprocessor fields) are absent. |
+| BES evidence location | The files sit on `overseasSites.sites[].besEvidence.besEvidenceUploads[]`. The top-level `besEvidence` has only `sectionStatus` and `versions[]` (with no files). The CM payload uses `besEvidence.files[]` per site instead. |
+| `scanStatus` is mixed | It is an int on `samplingPlan.files[]` (`1` = Clean) but the string `'Clean'` on BES evidence uploads. |
+| Submission snapshot | Each section's `versions[0]` is the state at submission (`versionedAt` = `dateSent`). It matches the current values because no query was raised. |
+| Status sync | `applicationStatus: 'Rejected'` and `caseManagementStatusUpdatedAt` are written by the CM status push (the CM `status-push-sent` entries). |
+| Link to the CM | `caseManagementWorkItemId` is a BSON `UUID` equal to the CM `_id`. The CM `payload.operatorApplicationId` equals this document's `_id`. |
+| Mismatch to note | The CM `rejected` note text reads `'Approved'` and is free text, so it must not be used to derive the outcome. Use `applicationStatus` / the CM `stateId`. |
+
 ## 3. Collections & indexes
 
 | Collection | Purpose | Key / indexes |
