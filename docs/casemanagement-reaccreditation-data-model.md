@@ -650,6 +650,178 @@ snapshot is the v14 template in section 5. A personal contact email was replaced
 | Section key casing | `latestSections.sections` uses `Prns` / `BusinessPlan`, while the canonical payload fields are `prns` / `businessPlan`; `sectionKeys` uses the CM kebab-case keys. |
 | `sla-extended` | The sample shows this audit action, which was missing from the audit list in section 5. |
 
+## 2c. Sample document (exporter, state `rejected`)
+
+A second stored document (mongosh notation, perf-test environment), this time an **exporter** that was duly made,
+assessed and **refused** (terminal state `rejected`, shown to users as "Refused"). It is the OJ counterpart of the
+exporter in the OJ model, section 2c (same `applicationReference` and `operatorApplicationId`). `templateSnapshot`
+(the v14 template, section 5) and `auditLog` are abbreviated (marked `/* … */`). Unlike section 2b it has no query
+round-trip, so `currentQuery` is `null` and `latestSections` is absent.
+
+```js
+{
+  _id: 'a0da8b3a-a2e9-4dd0-84e0-92cc146f2569',
+  typeId: 're-accreditation',
+  stateId: 'rejected',
+  submittedAt: ISODate('2026-10-09T09:33:05.549Z'),
+  lastModifiedAt: ISODate('2026-10-09T09:42:00.698Z'),
+  submittedBy: 'epr-register-enrol-backend',
+  assignedToId: 'stub-caseworker-1',
+  assignedToName: 'Stub Caseworker One',
+  assignedAt: ISODate('2026-10-09T09:34:07.146Z'),
+  assignedBy: 'stub-caseworker-1',
+  templateSnapshot: { templateVersion: 'v14', states: [ /* 9 states */ ], transitions: [ /* 24 transitions */ ] },
+  templateVersion: 'v14',
+  payload: {
+    organisationName: 'PerfTest Exporter 002',
+    registrationNumber: 'PERF-61002',
+    materialsHandled: [ 'glass' ],
+    material: 'glass',
+    accreditationYear: NumberInt('2027'),
+    previousAccreditationYear: NumberInt('2026'),
+    complianceIssuesReported: NumberInt('0'),
+    nation: 'Scotland',
+    companyRegisterAddressPostcode: 'EH1 1AA',
+    companyRegisteredAddress: 'Export House 2, Edinburgh, EH1 1AA',
+    companiesHouseNumber: 'PERF61002',
+    permitNumbers: [ 'WML61002' ],
+    wasteProcessingType: 'exporter',
+    operatorApplicationId: '6ac8b365d027450b4bfa20b3',     // = OJ _id
+    operatorOrganisationId: '61002',
+    operatorOrgNumber: NumberInt('61002'),
+    operatorRegistrationId: 'aaa000000000000000061002',
+    operatorEmail: 'test@defra.gov.uk',
+    chargeAmountPence: NumberInt('185800'),
+    paymentReference: 'E800 81581/61002',
+    submittedBy: { fullName: 'John Smith', jobTitle: 'Director', email: 'test@defra.gov.uk' },
+    submitterContactDetails: { fullName: 'Stub Submitter', email: 'stub.submitter@example.com', phone: '01234 567890', jobTitle: 'Stub Job Title' },
+    prns: {
+      plannedTonnageBand: 'UpTo500',                        // string here, int (0) in the OJ
+      authorisers: [ { fullName: 'Stub Authoriser', email: 'stub@example.com', isNew: false } ]
+    },
+    businessPlan: {
+      newInfrastructurePercent: NumberInt('20'), priceSupportPercent: NumberInt('20'),
+      businessCollectionsPercent: NumberInt('15'), communicationsPercent: NumberInt('15'),
+      newMarketsPercent: NumberInt('10'), newUsesPercent: NumberInt('10'), otherPercent: NumberInt('10'),
+      newInfrastructureDetail: 'q', priceSupportDetail: 'q', businessCollectionsDetail: 'q',
+      communicationsDetail: 'q', newMarketsDetail: 'q', newUsesDetail: 'q', otherDetail: 'q'
+    },
+    samplingPlan: {
+      files: [
+        {
+          fileId: '287f3c58-d6ce-42e5-b08c-eb3777cbb039',
+          filename: 'image.png',
+          contentType: 'image/png',
+          uploadedAt: '2026-10-09T09:28:06.888Z',           // string, not ISODate
+          scanStatus: 'Clean',
+          s3Key: 'sampling-plans/accreditation/sampling-plan/6ac8b365d027450b4bfa20b3/f7c25286-…/287f3c58-…',
+          s3Bucket: 'epr-register-enrol-file-uploads'
+        }
+      ]
+    },
+    overseasSites: {
+      sites: [
+        {
+          // Site 1: fully populated, with an interim site (interimSite and interimSites[] carry the same entry)
+          siteId: NumberInt('96100201'), selected: true, orsId: '001',
+          siteName: 'Overseas Site 1 (Germany)',
+          siteAddress: '1 Hannover street, Hannover, Germany',
+          addressLine1: '1 Hannover street', addressLine2: '', townOrCity: 'Hannover', country: 'Germany',
+          coordinates: '51.5034, -0.1275',
+          contactName: 'John Smith', contactEmail: 'm@example.com', contactPhone: '',
+          operationCodes: [ 'R5' ], code1: 'A1090', repatriatedLoads: 'wer',
+          isEu: true, isOecd: true, isNewSite: false, registeredNowAccredited: false,
+          interimSite: {
+            siteId: NumberInt('96100205'), siteNumber: '001', isNewSite: true, country: 'Germany',
+            siteName: 'Overseas Site 1 Interim Site 1  (Germany)',
+            addressLine1: '1 Bellefield Road', addressLine2: '', townOrCity: 'Bellefield',
+            stateOrRegion: '', postcode: '',
+            contactName: 'John Smith', contactEmail: 'm@example.com', contactPhone: '+447961360044',
+            operationCodes: [ 'R12', 'R13' ],
+            createdAt: '2026-10-09T09:31:42.089Z'            // string
+          },
+          interimSites: [ /* same entry as interimSite */ ],
+          besEvidence: { files: [] }
+        },
+        { siteId: NumberInt('96100202'), orsId: '002', siteName: 'Overseas Site 2 (France)',  country: 'France',  isEu: true,  isOecd: true,  /* minimal: siteAddress, operationCodes: [], interimSites: [], besEvidence: { files: [] } */ },
+        { siteId: NumberInt('96100203'), orsId: '003', siteName: 'Overseas Site 3 (Japan)',   country: 'Japan',   isEu: false, isOecd: true,  /* as above */ },
+        {
+          // Site 4: non-EU and non-OECD, so BES evidence is required
+          siteId: NumberInt('96100204'), orsId: '004', siteName: 'Overseas Site 4 (Vietnam)',
+          country: 'Vietnam', isEu: false, isOecd: false, /* … */
+          besEvidence: {
+            files: [
+              {
+                fileId: '3fb11116-1cc1-4ec2-a387-2fdbd1772f08',
+                filename: 'screens-1.png',
+                contentType: 'image/png',
+                uploadedAt: '2026-10-09T09:32:39.145Z',
+                scanStatus: 'Clean',
+                besEvidenceValidFromDate: '2026-11-11T00:00:00.000Z',
+                s3Key: 'bes-evidence/accreditation/bes-evidence/6ac8b365d027450b4bfa20b3/96100204/4e4f0f0a-…/3fb11116-…',
+                s3Bucket: 'epr-register-enrol-file-uploads'
+              }
+            ]
+          }
+        }
+        // every site also carries selected: true, isNewSite: false, registeredNowAccredited: false
+      ]
+    },
+    source: 'operator-fe',
+    applicationReference: 'AP27SE0610021AAGL',
+    glassRecyclingProcess: null,
+    siteAddressPostcode: null,
+    accreditationId: null,                                   // never set: the item was refused
+    accreditationStartDate: null,
+    slaClock: null,
+    paymentDate: '2026-06-27',
+    currentQuery: null
+  },
+  notes: [
+    {
+      _id: '1808e2eb-0f77-4c48-837d-fc19b295a9ee',
+      text: 'Approved',                                        // note text, although the outcome was a refusal
+      createdAt: ISODate('2026-10-09T09:41:47.945Z'),
+      createdBy: 'stub-caseworker-1',
+      createdByName: 'Stub Caseworker One'
+    }
+  ],
+  auditLog: [
+    /* 12 entries, in order:
+       work-item-submitted (stateId submitted; createdBy = the applicant's email, createdByName 'John Smith')
+       routed-to-nation (details.nation 'Scotland'; createdBy null)
+       assigned
+       action-applied  duly-make            submitted -> duly-made   (details.paymentDate '2026-06-27')
+       sla-clock-started                    (targetDays '84', anchoredTo 'payment-date')
+       status-push-sent                     (duly-make, correlationId …)
+       action-applied  payment-received     duly-made -> assessment-in-progress
+       status-push-sent                     (payment-received)
+       note-added
+       action-applied  submit-for-decision  assessment-in-progress -> awaiting-decision
+       action-applied  reject               awaiting-decision -> rejected
+       status-push-sent                     (reject, toStateDisplayName 'Refused') */
+  ],
+  slaClock: {
+    startedAt: ISODate('2026-06-27T00:00:00.000Z'),        // = payment date
+    targetDuration: NumberLong('72576000000000'),            // ticks = 84 days (no extension)
+    breached: false
+  },
+  version: NumberInt('10')
+}
+```
+
+**Observations from this sample**
+
+| Observation | Detail |
+| --- | --- |
+| Exporter payload | `overseasSites.sites[]` is populated and `siteAddressPostcode` / `glassRecyclingProcess` are `null`. Each site's `besEvidence` is `{ files: [...] }`, whereas the OJ stores `{ besEvidenceUploads: [...], doYouWantToUploadMoreEvidence }`. |
+| No `previousSites` | The OJ's `previousSites[]` on each overseas site is not copied into the CM payload. |
+| No section history | The OJ's `versions[]` and `sectionStatus` on each section are not copied. The CM payload holds only the current values. |
+| Refusal | A refusal is the `reject` action from `awaiting-decision`. `accreditationId` and `accreditationStartDate` stay `null`, and every state change is followed by a `status-push-sent` entry. |
+| `slaClock` mirrors | `payload.slaClock` is `null` in this sample, while the top-level `slaClock` holds the real clock. With no extension, `targetDuration` is `72576000000000` ticks = 84 days. |
+| Display names | `assessment-in-progress` displays as "Updated" and `rejected` as "Refused" (see `templateSnapshot.states[].displayName`). |
+| Link to the OJ | `payload.operatorApplicationId` equals the OJ `_id` and the OJ's `caseManagementWorkItemId` equals this `_id`. |
+
 ## 3. Collections & indexes
 
 | Collection | Purpose | Indexes |
