@@ -289,6 +289,35 @@ services:
 
 
 ################################################################################
+# Defra ID OIDC stub (opt-in: COMPOSE_PROFILES=defra-id-stub, see .env.example)
+#
+# Lets the operator frontend's "Sign in with Defra ID" button use the real
+# Defra ID code path against DEFRA/epr-register-enrol-defra-id-stub. Browsers
+# reach it on http://localhost:3200; the operator frontend's server calls its
+# token endpoint and JWKS by container name. Its seed users have relationships
+# to orgs 50001-50003, which the backend's stub Re-Ex links to the Defra org
+# with the same id. The client id and secret default to the stub's own
+# defaults and follow DEFRA_ID_CLIENT_ID / DEFRA_ID_CLIENT_SECRET when set.
+
+  epr-register-enrol-defra-id-stub:
+    image: defradigital/epr-register-enrol-defra-id-stub:${EPR_REGISTER_ENROL_DEFRA_ID_STUB:-latest}
+    platform: linux/amd64
+    ports:
+      - '3200:3000'
+    environment:
+      PORT: 3000
+      STUB_EXTERNAL_URL: http://localhost:3200
+      STUB_INTERNAL_URL: http://epr-register-enrol-defra-id-stub:3000
+      CALLBACK_OJ_URL: http://localhost:3000
+      OJ_CLIENT_ID: ${DEFRA_ID_CLIENT_ID:-epr-register-enrol-frontend}
+      OJ_CLIENT_SECRET: ${DEFRA_ID_CLIENT_SECRET:-operator-journey-stub-secret}
+      USERS_FILE_PATH: ./data/local/users.json
+    networks:
+      - cdp-tenant
+    profiles:
+      - defra-id-stub
+
+################################################################################
 # Journey test services (opt-in: docker compose --profile tests run --rm mgmt-tests)
 #
 # selenium-chrome provides a remote WebDriver endpoint; mgmt-tests runs the

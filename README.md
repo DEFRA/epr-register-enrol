@@ -93,9 +93,39 @@ docker compose down -v         # stop and remove containers + volumes
 | Case-management backend         | http://localhost:8085 |
 | EPR Register & Enrol frontend   | http://localhost:3000 |
 | EPR Register & Enrol backend    | http://localhost:8080 |
+| Defra ID stub (`defra-id-stub` profile) | http://localhost:3200 |
 
 (See each submodule's own `README.md` for ports and configuration specific to
 that service.)
+
+### Signing in with the Defra ID stub
+
+The operator frontend's stub chooser can also offer **Sign in with Defra ID**,
+which runs the frontend's real Defra ID login. Locally that can go to
+[epr-register-enrol-defra-id-stub](https://github.com/DEFRA/epr-register-enrol-defra-id-stub)
+instead of real Defra ID. It is behind the `defra-id-stub` compose profile, so
+the default stack is unchanged. In `.env`, set:
+
+```
+COMPOSE_PROFILES: defra-id-stub
+DEFRA_ID_CLIENT_ID: epr-register-enrol-frontend
+DEFRA_ID_CLIENT_SECRET: operator-journey-stub-secret
+DEFRA_ID_DISCOVERY_URL: http://epr-register-enrol-defra-id-stub:3000/.well-known/openid-configuration
+```
+
+Then `docker compose up`. The stub runs on http://localhost:3200 from the
+`defradigital/epr-register-enrol-defra-id-stub` image (set
+`EPR_REGISTER_ENROL_DEFRA_ID_STUB` to pick a tag). To run a local build, build
+it from the stub repo with
+`docker build --tag defradigital/epr-register-enrol-defra-id-stub:local .` and
+set `EPR_REGISTER_ENROL_DEFRA_ID_STUB=local`.
+
+Sign in as one of the stub's seed users, for example
+`newdev.recycling@test.gov.uk`. Each has a Defra ID relationship to one of the
+organisations 50001, 50002 or 50003, which the backend's stub Re-Ex links to
+the Defra organisation with the same id, so that user can open that
+organisation's accreditation pages. The stub's README lists the users and
+explains how to register more.
 
 ## Running the frontend E2E journey tests locally
 
