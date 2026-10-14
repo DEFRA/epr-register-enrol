@@ -343,6 +343,12 @@ services:
       BASE_URL: http://case-management-frontend:5000
       CHROMEDRIVER_URL: selenium-chrome
       CHROMEDRIVER_PORT: "4444"
+      # Runs the specs that need the compose stack (seeded fixtures, direct
+      # management-be calls); without it they skip as they do on CDP.
+      COMPOSE_STACK: "true"
+      # The API-driven helpers call management-be directly; their default is
+      # http://localhost:8085, which is not reachable from this container.
+      MANAGEMENT_BE_URL: http://case-management-backend:8085
     depends_on:
       case-management-frontend:
         condition: service_started
