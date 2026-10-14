@@ -50,6 +50,14 @@ git submodule update --init --recursive
 
 ## Running locally
 
+Set secrets as environment variables:
+
+```bash
+cp .env.example .env
+```
+
+Edit the .env file, adding secrets as required.
+
 A root [`compose.yml`](compose.yml) brings up all four services plus their
 shared dependencies (MongoDB, Redis, and the Floci AWS emulator) on a single
 Docker network.
@@ -89,6 +97,92 @@ docker compose down -v         # stop and remove containers + volumes
 (See each submodule's own `README.md` for ports and configuration specific to
 that service.)
 
+## Running the frontend E2E journey tests locally
+
+The `epr-register-enrol-fe-tests` submodule carries its own Docker Compose
+stack and a WebdriverIO suite. Running it the way described here mirrors CI:
+Linux containers, the same Selenium Chrome image, and a real backend.
+
+**The test runner must run inside a Linux container.** The suite's
+`esm-module-alias` loader does not work on Windows, so running `npx wdio`
+directly on a Windows host will fail regardless of how the stack is configured.
+
+### 1. Free the ports
+
+The root stack and the fe-tests stack both bind 3000, 8080 and 4444, so only
+one can run at a time. Stop the root stack first:
+
+```bash
+docker compose down
+```
+
+If a previous fe-tests run left containers up and unhealthy, clear them:
+
+```bash
+cd lib/epr-register-enrol-fe-tests && docker compose down -v
+```
+
+### 2. Build the service images from local source
+
+So the tests exercise your working copy rather than a published image:
+
+```bash
+docker build -t defradigital/epr-register-enrol-frontend:local lib/epr-register-enrol-frontend
+docker build -t defradigital/epr-register-enrol-backend:local  lib/epr-register-enrol-backend
+```
+
+### 3. Start the test stack
+
+From the fe-tests submodule. This brings up MongoDB, Redis, the Floci AWS
+emulator, the CDP uploader, both services and Selenium Chrome:
+
+```bash
+cd lib/epr-register-enrol-fe-tests
+EPR_REGISTER_ENROL_FRONTEND=local \
+EPR_REGISTER_ENROL_BACKEND=local \
+docker compose up --wait --wait-timeout 300 -d
+```
+
+Every container must reach `Up` or `(healthy)`. Check with `docker ps`, and on
+a failure read that service's logs with `docker compose logs <service>`.
+
+### 4. Build the test runner image
+
+```bash
+docker build -t epr-fe-tests .
+```
+
+Skip this if the image exists and the suite hasn't changed since it was built
+(`docker image inspect epr-fe-tests --format '{{.Created}}'`).
+
+### 5. Run the suite
+
+The runner must join the same Docker network as the stack. Compose names it
+after the project directory, so it is `epr-register-enrol-fe-tests_cdp-tenant`:
+
+```bash
+docker run --rm \
+  --network epr-register-enrol-fe-tests_cdp-tenant \
+  --entrypoint bash \
+  -e CHROMEDRIVER_URL=selenium-chrome \
+  -e BASE_URL=http://epr-register-enrol-frontend:3000 \
+  epr-fe-tests -c "rm -rf allure-results allure-report && npx wdio run wdio.github.conf.js"
+```
+
+Append `--spec test/specs/<name>.e2e.js` to the `wdio run` command to run a
+single spec — for example `operator-accreditation` (the reprocessor journey),
+`exporter-accreditation`, or `query-resubmit`.
+
+### 6. Tear down
+
+The stack is deliberately left running so you can re-run or debug. When
+finished:
+
+```bash
+docker compose down -v          # from lib/epr-register-enrol-fe-tests
+cd ../.. && docker compose up --wait -d   # restart the root dev stack
+```
+
 ## Troubleshooting
 
 - **Submodule directory is empty** — run
@@ -101,3 +195,14 @@ that service.)
   `DOTNET_USE_POLLING_FILE_WATCHER=1` is set (already configured for backends)
   and that you are editing files inside the synced paths declared in
   `compose.yml`.
+- **E2E tests fail immediately with a module-resolution error** — the suite is
+  being run on the host rather than inside a container. The `esm-module-alias`
+  loader only works on Linux; use the `docker run` invocation above.
+- **E2E stack won't start, ports already allocated** — the root stack is still
+  up. Run `docker compose down` at the repo root first; the two stacks both
+  bind 3000, 8080 and 4444.
+- **E2E tests can't reach the frontend** — the runner isn't on the stack's
+  network. It must be started with
+  `--network epr-register-enrol-fe-tests_cdp-tenant`, and `BASE_URL` must use
+  the container name (`http://epr-register-enrol-frontend:3000`), not
+  `localhost`.

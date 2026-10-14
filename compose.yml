@@ -21,6 +21,7 @@
 services:
   floci:
     image: hectorvent/floci:latest-aws
+    restart: on-failure
     ports:
       - '4566:4566'
     env_file:
@@ -63,19 +64,6 @@ services:
       retries: 3
       start_period: 30s
 
-
-  mongodb-init:
-    build:
-      context: ./lib/epr-register-enrol-backend/
-      dockerfile: Dockerfile.init
-    depends_on:
-      mongodb:
-        condition: service_started
-    environment:
-      MONGO_URL: mongodb://mongodb:27017
-    networks:
-      - cdp-tenant
-
   ################################################################################
 
   case-management-backend:
@@ -106,11 +94,13 @@ services:
       # its five guest-address slots and a send to anything else fails in the
       # case-management UI. Set Notify__SendEmails=true to opt back in.
       NOTIFY_API_KEY: ${NOTIFY_API_KEY}
-      # RA-227: fake England regulator mailbox so the notification-sent path
-      # works locally. appsettings.Development.json blanks every nation so no
-      # environment defaults to the live Environment Agency inbox; opt back in
-      # with an address that cannot receive mail even if NOTIFY_API_KEY is set.
       Notify__RegulatorMailboxes__England: regulator-england@example.test
+      OPERATOR_SERVICE_BASE_URL: http://localhost:3000
+      OperatorBackendApi__Enabled: "true"
+      OperatorBackendApi__URL: "http://epr-register-enrol-backend:8080"
+      OPERATOR_BACKEND_SHARED_SECRET: "local-dev-secret"
+      
+      
     networks:
       - cdp-tenant
     develop:
@@ -133,7 +123,7 @@ services:
     container_name: case-management-frontend
     ports:
       - '5001:5000'
-      - '9229:9229'
+      - '127.0.0.1:9229:9229'
     depends_on:
       floci:
         condition: service_healthy
@@ -149,9 +139,22 @@ services:
       REDIS_HOST: redis
       LOG_FORMAT: pino-pretty
       SESSION_COOKIE_SECURE: false
+      SESSION_CACHE_NAME: case-mgmt-session
       USE_SINGLE_INSTANCE_CACHE: true
       REDIS_TLS: false
       BACKEND_API_URL: http://case-management-backend:8085
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID_CASE_MANAGEMENT}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET_CASE_MANAGEMENT}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID_CASE_MANAGEMENT}
+      # Fall back to the app's own convict defaults (config.js) when unset in
+      # .env — Compose sets the var to an EMPTY STRING otherwise (not
+      # "unset"), which silently overrides the app default and breaks the
+      # real Entra ID role check for every local dev who hasn't customised
+      # these two vars.
+      ENTRA_REGULATOR_ROLE_VALUE: ${ENTRA_REGULATOR_ROLE_VALUE_CASE_MANAGEMENT:-Waste.Regulator.Standard}
+      ENTRA_SUPPORT_USER_ROLE_VALUE: ${ENTRA_SUPPORT_USER_ROLE_VALUE_CASE_MANAGEMENT:-Waste.SupportUser.ReadOnly}
+      AUTH_STUB_ENABLED: true
+      AUTH_CALLBACK_BASE_URL: http://localhost:5001
     networks:
       - cdp-tenant
     develop:
@@ -175,13 +178,16 @@ services:
 
   epr-register-enrol-backend:
 #    image: defradigital/epr-register-enrol-backend:${EPR_REGISTER_ENROL_BACKEND:-latest}
-    build: ./lib/epr-register-enrol-backend/
+    build:
+      context: ./lib/epr-register-enrol-backend/
+      target: development
     platform: linux/amd64
     links:
     - 'floci:floci'
     - 'mongodb:mongodb'
     environment:
       PORT: 8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       LOCALSTACK_ENDPOINT: 'http://floci:4566'
       Mongo__DatabaseUri: 'mongodb://mongodb:27017/'
       Mongo__DatabaseName: epr
@@ -198,8 +204,6 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_started
-      mongodb-init:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
       cdp-uploader:
@@ -209,15 +213,29 @@ services:
     healthcheck:
       test: ['CMD', 'curl', 'http://epr-register-enrol-backend:8080/health']
       interval: 3s
-      start_period: 2s
+      start_period: 30s
       retries: 3
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend
+          target: /src/EprRegisterEnrolBackend
+          ignore:
+            - bin/
+            - obj/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend/EprRegisterEnrolBackend.csproj
+        - action: rebuild
+          path: ./lib/epr-register-enrol-backend/EprRegisterEnrolBackend.sln
 
   epr-register-enrol-frontend:
     # image: defradigital/epr-register-enrol-frontend:${EPR_REGISTER_ENROL_FRONTEND:-latest}
     platform: linux/amd64
-    build: ./lib/epr-register-enrol-frontend/
+    build:
+      context: ./lib/epr-register-enrol-frontend/
+      target: development
     ports:
       - '3000:3000'
     links:
@@ -238,20 +256,42 @@ services:
       NODE_ENV: development
       REDIS_HOST: redis
       LOCALSTACK_ENDPOINT: http://floci:4566
+      SESSION_CACHE_NAME: operator-session
       USE_SINGLE_INSTANCE_CACHE: true
       API_BASE_URL: http://epr-register-enrol-backend:8080
-      API_OAUTH2_CLIENT_ID: epr-register-enrol-frontend
       API_STUB_ENABLED: false
-      API_OAUTH2_CLIENT_SECRET: 2c6e43f5-9a3c-4559-863a-741d2fcda42b
-      API_OAUTH2_TOKEN_URL: http://epr-register-enrol-backend:8080/token
-      API_OAUTH2_SCOPE: read write
+      REGULATOR_QUERY_TEXT_DISABLED: true
       API_TIMEOUT: 5000
       ASPNETCORE_ENVIRONMENT: Development
       CDP_UPLOADER_URL: http://cdp-uploader:7337
       CDP_UPLOADER_STUB_ENABLED: false
+      AUTH_STUB_ENABLED: true
+      AUTH_CALLBACK_BASE_URL: http://localhost:3000
+      DEFRA_ID_CLIENT_ID: ${DEFRA_ID_CLIENT_ID}
+      DEFRA_ID_CLIENT_SECRET: ${DEFRA_ID_CLIENT_SECRET}
+      DEFRA_ID_DISCOVERY_URL: ${DEFRA_ID_DISCOVERY_URL}
+      DEFRA_ID_SERVICE_ID: ${DEFRA_ID_SERVICE_ID}
+      # RA-459: unconditionally required now — the fallback destination for
+      # the accreditation session-expiry redirect and the task list's
+      # save-and-come-back-later link, both of which used to point at
+      # /operator (now test-only, gated by TEST_PAGES_DISABLED).
+      REEX_FRONTEND_BASE_URL: https://epr-frontend.dev.cdp-int.defra.cloud
 
     networks:
       - cdp-tenant
+    develop:
+      watch:
+        - action: sync
+          path: ./lib/epr-register-enrol-frontend/src
+          target: /home/node/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/package-lock.json
+        - action: rebuild
+          path: ./lib/epr-register-enrol-frontend/webpack.config.js
 
 
 ################################################################################
@@ -294,6 +334,7 @@ services:
 
   cdp-uploader:
     image: defradigital/cdp-uploader:${CDP_UPLOADER_VERSION:-latest}
+    platform: linux/amd64
     ports:
       - '7337:7337'
     depends_on:
