@@ -343,14 +343,18 @@ services:
       BASE_URL: http://case-management-frontend:5000
       CHROMEDRIVER_URL: selenium-chrome
       CHROMEDRIVER_PORT: "4444"
-      # Runs the specs that need the compose stack (seeded fixtures, direct
-      # management-be calls); without it they skip as they do on CDP.
-      COMPOSE_STACK: "true"
-      # The API-driven helpers call management-be directly; their default is
-      # http://localhost:8085, which is not reachable from this container.
+      # The suite creates its own work items through management-be, the
+      # operator backend and cdp-uploader. Their defaults point at
+      # localhost, which is not reachable from this container.
       MANAGEMENT_BE_URL: http://case-management-backend:8085
+      OPERATOR_BACKEND_URL: http://epr-register-enrol-backend:8080
+      CDP_UPLOADER_URL: http://cdp-uploader:7337
     depends_on:
       case-management-frontend:
+        condition: service_started
+      epr-register-enrol-backend:
+        condition: service_started
+      cdp-uploader:
         condition: service_started
       selenium-chrome:
         condition: service_started
