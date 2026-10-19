@@ -16,3 +16,9 @@
 [submodule "lib/epr-register-enrol-mgmt-tests"]
 	path = lib/epr-register-enrol-mgmt-tests
 	url = git@github.com:DEFRA/epr-register-enrol-mgmt-tests.git
+[submodule "lib/epr-register-enrol-entra-stub"]
+	path = lib/epr-register-enrol-entra-stub
+	url = git@github.com:DEFRA/epr-register-enrol-entra-stub.git
+[submodule "lib/epr-register-enrol-defra-id-stub"]
+	path = lib/epr-register-enrol-defra-id-stub
+	url = git@github.com:DEFRA/epr-register-enrol-defra-id-stub.git

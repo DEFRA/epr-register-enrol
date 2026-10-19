@@ -1,7 +1,7 @@
 # EPR Register & Enrol
 
-Umbrella repository for the EPR Register & Enrol services. The four services
-are tracked here as **git submodules** under `lib/`:
+Umbrella repository for the EPR Register & Enrol services. The services and
+their local auth stubs are tracked here as **git submodules** under `lib/`:
 
 | Submodule | Purpose |
 | --- | --- |
@@ -9,6 +9,8 @@ are tracked here as **git submodules** under `lib/`:
 | [`lib/epr-register-enrol-backend`](lib/epr-register-enrol-backend) | Public-facing register & enrol backend |
 | [`lib/epr-register-enrol-management-fe`](lib/epr-register-enrol-management-fe) | Internal case-management frontend |
 | [`lib/epr-register-enrol-management-be`](lib/epr-register-enrol-management-be) | Internal case-management backend |
+| [`lib/epr-register-enrol-entra-stub`](lib/epr-register-enrol-entra-stub) | Azure Entra ID stub (case-management sign-in) |
+| [`lib/epr-register-enrol-defra-id-stub`](lib/epr-register-enrol-defra-id-stub) | Defra ID stub (operator sign-in) |
 
 ## Cloning
 
