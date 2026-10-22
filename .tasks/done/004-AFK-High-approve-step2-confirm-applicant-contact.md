@@ -19,7 +19,7 @@ Repos: management-be, management-fe, mgmt-tests.
 **management-be**
 - New bespoke endpoint `POST …/re-accreditation/{id}/confirm-contact`, with the same authorisation as the decision endpoint. Add a confirm-contact transition `approved-pending-contact` → `approved` (CallerInvocable false), part of the v17 template.
 - Agreed run order:
-  1. **Pre-commit OJ push** (existing decision push with the larger retry pipeline): to-state `approved`, from-state `approved-pending-contact`, a single `OccurredAt`. On failure: 500, **nothing written**.
+  1. **Pre-commit OJ push** (existing decision push with the larger retry pipeline): to-state `approved`, from-state `approved-pending-contact`, a single `OccurredAt`. On failure: 500, no state or outcome changes; `status-push-failed` written.
   2. **One CM write**: state `approved`, SLA clock stopped (`StoppedAt` = the same timestamp), audit "Applicant contacted" with the acting user plus the existing action-applied / sla-clock-stopped / accreditation-issued entries, and publishing enqueued. Reuse the number stamped at step 1.
   3. **Post-action hooks**: Decision Notify email (unchanged template and personalisation).
 - Called on an item already `approved` → replay success, no duplicate side effects. Called from any other state → 409. Not found / wrong type → as existing endpoints.
@@ -44,7 +44,7 @@ Repos: management-be, management-fe, mgmt-tests.
 
 ## Acceptance criteria
 
-- [x] management-be endpoint tests: confirm from `approved-pending-contact` → `approved`, OJ push sent with to-state `approved`, SLA stopped, publishing enqueued, Decision email sent, audit "Applicant contacted" with the user. Push failure → 500 and the work item unchanged (state, SLA, audit, publishing). Replay on `approved` is a no-op success. Other states → 409.
+- [x] management-be endpoint tests: confirm from `approved-pending-contact` → `approved`, OJ push sent with to-state `approved`, SLA stopped, publishing enqueued, Decision email sent, audit "Applicant contacted" with the user. Push failure → 500, no state or outcome changes (state, SLA, outcome audit, publishing); `status-push-failed` written. Replay on `approved` is a no-op success. Other states → 409.
 - [x] The existing log-decision service tests for push-before-write are carried over to the confirm-contact flow.
 - [x] management-fe tests: confirm page GET/POST (copy, validation error, Cancel, wrong-state redirects, read-only disabled, backend failure); success flash once only; terminal wording; backend client.
 - [x] mgmt-tests: the full existing suite that reaches Granted passes again, using the re-composed helper. The RA-368 and RA-203 approval assertions move to step 2.
@@ -65,3 +65,8 @@ Repos: management-be, management-fe, mgmt-tests.
 - management-fe: backend client `confirmApplicantContact` (decision timeout). New `re-accreditation/confirm-contact/` routes, controller, service and `routes/re-accreditation/confirm-contact/index.njk`. GET is open to read-only users with the controls disabled; POST has `requireStandard`. testids: `confirm-contact-form`, `-checkbox`, `-submit`, `-cancel`, `-error-summary`, `-error`, `-failure-banner`. Wrong state → redirect to detail. Failure → banner on the page (409 conflict copy / 502). Success → one-time flash "Applicant contacted". `PENDING_CONTACT_STATE_IDS` / `isPendingContact` moved to `re-accreditation/states.js`, and the success copy is keyed by pending state (task 005 adds `rejected-pending-contact` to both). Closed panel copy updated. The Outcome box already had the Design 3 copy and is now tested for Granted and Refused. The module mirror has `confirm-contact-approved`.
 - mgmt-tests: `confirm-contact.page.js` and `confirmApplicantContact` helper. `driveToApproved` = `driveToApprovedPendingContact` + `confirmApplicantContact`, and `approveWorkItem` does both steps. All eight specs listed in task 003 are updated to confirm contact before expecting Granted. RA-203: the Decision email is absent after step 1 and present after step 2. RA-368: step 1 pushes nothing (OJ Updated), and step 2 adds the third push (OJ Approved). ra-358 asserts the Design 3 closed/Outcome wording.
 - Quality gates: management-be `dotnet format style --verify-no-changes` and the full `dotnet test` (2345 tests, all pass; re-ran the ReAccreditation+Notify subset after the review fixes). management-fe lint, format:check and test (2226). mgmt-tests lint and format:check. Browser specs were not run (they need the full stack, task 008).
+
+## Note (2026-10-22, task 007)
+
+- The push-failure acceptance-criteria wording above was amended from "nothing written" / "audit unchanged" to "no state or outcome changes; `status-push-failed` written", which is what the code does and what `main` did. That entry is shown to regulators, not only to support. See `.tasks/007-AFK-Medium-step2-parity-with-single-step.md`.
+- Task 007 also moved the stamping of `accreditationStartDate` and `accreditationYear` to this step.

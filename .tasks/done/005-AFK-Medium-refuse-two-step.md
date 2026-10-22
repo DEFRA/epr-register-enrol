@@ -15,7 +15,7 @@ Medium
 The same two-step process for refusals, reusing the pattern built in tasks 003 and 004.
 
 - **Step 1:** submitting "Make determination" with **Refused** moves the item to a new non-terminal state, **`rejected-pending-contact`** (tag **"Refusing"**, orange). No accreditation number is minted. Record the audit entry "Determination made: Refused". No OJ push, SLA stop or email.
-- **Step 2:** "Confirm applicant contact" moves it to the existing `rejected` ("Refused"), with the same run order as approvals: pre-commit OJ push to `rejected` (failure → nothing written), then one write (state, SLA stopped, audit "Applicant contacted"), and **no** email (RA-211: regulators send refusal notices themselves).
+- **Step 2:** "Confirm applicant contact" moves it to the existing `rejected` ("Refused"), with the same run order as approvals: pre-commit OJ push to `rejected` (failure → no state or outcome changes; `status-push-failed` written), then one write (state, SLA stopped, audit "Applicant contacted"), and **no** email (RA-211: regulators send refusal notices themselves).
 
 Repos: management-be, management-fe, mgmt-tests.
 
@@ -44,7 +44,7 @@ Repos: management-be, management-fe, mgmt-tests.
 - [x] management-be endpoint tests:
   - step 1 Refused → `rejected-pending-contact`, no number minted, no push, SLA running, audit entry;
   - step 2 → `rejected`, push to-state `rejected`, SLA stopped, **no** Decision email, audit "Applicant contacted";
-  - push failure → nothing written;
+  - push failure → no state or outcome changes; `status-push-failed` written;
   - replay and 409 cases;
   - push hook exclusion;
   - available actions.
@@ -93,3 +93,9 @@ Repos: management-be, management-fe, mgmt-tests.
   - management-be: `dotnet format style --verify-no-changes` and the full `dotnet test` (2369 passed, 9 skipped).
   - management-fe: lint, format:check and test (2240).
   - mgmt-tests: lint and format:check. Browser specs were not run (they need the full stack, task 008).
+
+## Note (2026-10-22, task 007)
+
+- The push-failure acceptance-criteria wording above was amended from "nothing written" to "no state or outcome changes; `status-push-failed` written", which is what the code does and what `main` did. See `.tasks/007-AFK-Medium-step2-parity-with-single-step.md`.
+- Reverted at the user's request by task 007: "Refused on an already-Refused item is 409" goes back to `main`'s behaviour, a 200 idempotent replay (replay header, item unchanged and still Refused, nothing pushed or written). Approved on a Refused item is still 409.
+- Also changed by task 007: refusal step 2 no longer stops the SLA clock (no payload `slaClock.stoppedAt` and no `sla-clock-stopped` entry), matching `main`'s single-step refuse.

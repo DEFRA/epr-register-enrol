@@ -80,3 +80,8 @@ Repos: management-be, management-fe, mgmt-tests.
   - management-be: `dotnet format style --verify-no-changes`, and the full `dotnet test` (2313 tests, about 2 minutes).
   - management-fe: lint, format:check and test (2184).
   - mgmt-tests: lint and format:check. Browser specs were not run (they need the full stack, task 008).
+
+## Note (2026-10-22, task 007)
+
+- Reverted at the user's request by `.tasks/007-AFK-Medium-step2-parity-with-single-step.md`: "Approved on an already-Granted item is 409" goes back to `main`'s behaviour, a 200 idempotent replay (replay header, item unchanged and still Granted, nothing minted, pushed, written or emailed). Refused on a Granted item is still 409.
+- Also changed by task 007: step 1 now stamps only `accreditationId`. The start date and year are stamped at step 2, and their rows show only once Granted. The existing-accreditation-number guard ("Manual investigation required") is restored on the step 1 path, before the mint.
