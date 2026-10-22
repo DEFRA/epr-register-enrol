@@ -26,4 +26,4 @@ A human-in-the-loop check that RA-527 works end to end, matches the design, and 
 ## Blocked by
 
 - `.tasks/001-AFK-Low-remove-bespoke-approve-endpoint.md`
-- `.tasks/007-AFK-Medium-e2e-two-step-determination-spec.md`
+- `.tasks/008-AFK-Medium-e2e-two-step-determination-spec.md`
