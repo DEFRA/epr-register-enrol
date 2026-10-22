@@ -22,12 +22,12 @@ Split the determination into two steps, for both outcomes:
 | Regulator action | CM state id → tag (colour) | Operator status |
 |---|---|---|
 | Before determination | unchanged (e.g. `assessment-in-progress`) | unchanged |
-| Approve (step 1) — number minted | **new** `approved-pending-contact` → **"Approved"** (light blue), non-terminal | unchanged — no push |
-| Refuse (step 1) — no number | **new** `rejected-pending-contact` → **"Refusing"** (orange), non-terminal | unchanged — no push |
+| Approve (step 1) — number minted | **new** `approved-pending-contact` → **"Approved"** (green, the same colour as Granted), non-terminal | unchanged — no push |
+| Refuse (step 1) — no number | **new** `rejected-pending-contact` → **"Refused"** (red, the same label and colour as the final Refused), non-terminal | unchanged — no push |
 | Confirm applicant contact (step 2) after approval | existing `approved` → "Granted" (green), terminal | existing `Approved` → "GRANTED", pushed now |
 | Confirm applicant contact (step 2) after refusal | existing `rejected` → "Refused" (red), terminal | existing `Rejected` → "REFUSED", pushed now |
 
-Existing state ids, labels and OJ mappings are unchanged; the only new states are the two pending-contact states. **Provisional:** the "Refusing" label and both new tag colours (light blue / orange) may change later. Keep each as a single label/colour mapping entry, so that changing it is a one-line edit plus test updates.
+Existing state ids, labels and OJ mappings are unchanged; the only new states are the two pending-contact states. **Decided (2026-10-22, task 010):** `rejected-pending-contact` reads "Refused", the same as the final `rejected`; "Approved" (step 1) has the same tag colour as Granted (green) and "Refused" (step 1) the same as the final Refused (red). Each label and colour is still a single mapping entry. The state id, the banner and the "Confirm applicant contact" button tell a pending refusal apart from a final one.
 
 ## User Stories
 
@@ -41,7 +41,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 6. As a regulator, I want an accreditation number minted and shown to me as soon as I approve, so that I can quote it when I contact the applicant.
 7. As a regulator, I want choosing Refused and submitting to record my determination without changing what the operator sees, so that the refusal is not visible before I contact them.
 8. As a regulator, I want the work item tagged "Approved" after approving, so that I can tell at a glance it is approved but not yet applied.
-9. As a regulator, I want the work item tagged "Refusing" after refusing, so that I can tell at a glance a refusal has been made but not yet applied.
+9. As a regulator, I want the work item tagged "Refused" after refusing (with the "Application refused" banner and the "Confirm applicant contact" button), so that I can tell a refusal has been made but not yet applied.
 10. As a regulator, after approving, I want a banner "Application approved — The application was approved. You now need to contact the applicant about the decision." with "Accreditation ID: <number>", so that I know what to do next.
 11. As a regulator, after refusing, I want a banner "Application refused — The application was refused. You now need to contact the applicant about the decision.", so that I know what to do next.
 12. As a regulator, I want the step 1 banner to remain on every visit while the work item is pending contact, so that the outstanding action is never lost.
@@ -90,9 +90,9 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 
 ### Work-items list
 
-46. As a regulator, I want "Approved" and "Refusing" options in the Status filter (between "Queried" and "Granted"), so that I can find work items awaiting contact.
+46. As a regulator, I want an "Approved" option in the Status filter (between "Queried" and "Granted"), and the one "Refused" option to cover refusals both pending contact and final, so that I can find work items awaiting contact.
 47. As a regulator, I want pending-contact work items shown in the default (non-archived) list, so that outstanding contact work is never hidden.
-48. As a regulator, I want the "Approved" tag light blue and the "Refusing" tag orange in the list and header, so that pending outcomes are visually distinct from final ones.
+48. As a regulator, I want the "Approved" tag green like Granted and the step 1 "Refused" tag red like the final Refused, in the list and header, so that the colour shows the outcome.
 
 ### Housekeeping
 
@@ -103,7 +103,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 ## Implementation Decisions
 
 ### Workflow / state model (management-be, mirrored in management-fe)
-- Add two non-terminal states to the re-accreditation work-item type: `approved-pending-contact` (display "Approved") and `rejected-pending-contact` (display "Refusing").
+- Add two non-terminal states to the re-accreditation work-item type: `approved-pending-contact` (display "Approved") and `rejected-pending-contact` (display "Refused", the same as `rejected`).
 - Existing `approved` ("Granted") and `rejected` ("Refused") remain the only terminal decision states, with unchanged ids and labels.
 - New transitions (CallerInvocable false, so the bespoke endpoints are the only way in): from the decision-entry path into each pending state (step 1), and from each pending state into its terminal state (step 2, "confirm applicant contact").
 - From the pending states, only confirm-contact, reassign and unassign are available. Query, withdraw, due-date change/override and re-determination are not available.
@@ -131,10 +131,10 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 
 ### management-fe UI
 - **Decision form:** H1 "Make determination", notes label "Notes (optional)", the new hint text (Design 3). Warning, radios, button and Cancel are unchanged. The success flash after step 1 is replaced by the persistent pending banners.
-- **Detail page in pending states:** status tag ("Approved" light blue / "Refusing" orange); the persistent step 1 banner (approval includes "Accreditation ID: <number>"); accreditation summary rows for approvals (decision metadata is built for `approved-pending-contact` as well as `approved`); sidebar shows the "Assigned to you" box with only Reassign/Unassign plus a separate box with a primary "Confirm applicant contact" button (disabled for read-only users); "Make determination", Query and due-date links are hidden.
+- **Detail page in pending states:** status tag ("Approved" green / "Refused" red); the persistent step 1 banner (approval includes "Accreditation ID: <number>"); accreditation summary rows for approvals (decision metadata is built for `approved-pending-contact` as well as `approved`); sidebar shows the "Assigned to you" box with only Reassign/Unassign plus a separate box with a primary "Confirm applicant contact" button (disabled for read-only users); "Make determination", Query and due-date links are hidden.
 - **Confirm page:** new GET/POST route under the re-accreditation work-item routes (`…/{id}/confirm-contact`), `requireStandard` on the POST. Controls are disabled for read-only users. The GOV.UK checkbox has the error summary and inline error. Cancel returns to the detail page. If the item is not in a pending state, both GET and POST redirect to the detail page. A successful POST redirects to the detail page with a one-time "Applicant contacted" flash banner whose wording depends on the outcome.
 - **Terminal pages:** the closed-panel wording becomes "This application is closed and can no longer be assigned or reassigned."; Outcome box wording "This work item is in a final state. No further decision actions are available."
-- **Work-items list:** Status filter options "Approved" → `approved-pending-contact` and "Refusing" → `rejected-pending-contact`, inserted between "Queried" and "Granted". Pending states are not archived. The state badge map gets `approved-pending-contact` light blue and `rejected-pending-contact` orange.
+- **Work-items list:** Status filter option "Approved" → `approved-pending-contact`, between "Queried" and "Granted". There is no separate option for the step 1 refusal: the one "Refused" option (`status=rejected`) expands to `rejected` and `rejected-pending-contact`, as "Updated" expands to two state ids, and the list query sends both as repeated `stateId=` params. "Approved" and "Granted" stay separate. Pending states are not archived. The state badge map gives `approved-pending-contact` green (as `approved`) and `rejected-pending-contact` red (as `rejected`).
 - Follow management-fe conventions: service objects return `{ ok, … }` results, `data-testid`s on new controls (they are a contract with mgmt-tests), `disabled: user.isReadOnly` on every control.
 
 ### Removal of the bespoke `/approve` endpoint (option B)
@@ -150,7 +150,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 - **management-be (xUnit v3 + NSubstitute + EphemeralMongo):** primary seam is the HTTP endpoints via the existing re-accreditation endpoint test harness, with the OJ push, accreditation-number and Notify adapters stubbed. Cover: step 1 approve/refuse → pending state, number minted (approve only), no push, SLA running, no email or publishing, audit entry; idempotent replay and 409s; step 2 from each pending state → terminal, push sent with the correct to-state, SLA stopped (approve only; a refusal leaves it running, task 007), publishing (approve), Decision email (approve only), audit; push failure → 500, no state or outcome change, `status-push-failed` written; confirm from a non-pending state → 409; the status-push hook never pushes pending states; v17 snapshot migration; `/approve` gone. Update the existing log-decision and approval service tests, the type, available-actions, lifecycle and hook-order tests where they assert the old single-step behaviour. Prior art: the existing log-decision endpoint and service tests, the status-push-hook tests, and the decision snapshot migration tests.
 - **management-fe (Vitest, `server.inject`, backend client stubbed):** decision form copy; the detail page in each pending state (tag, banner, rows, sidebar actions, hidden links, read-only disabled); confirm page GET/POST (validation error, Cancel, redirects for a wrong state, success flash per outcome, read-only); terminal-page wording; work-items filter options and badge colours; module/templateVersion v17 guard; route-scope coverage for the new POST; backend client for confirm-contact and `/approve` removal. Prior art: the decision controller, service and routes tests, the detail controller tests, the module test, and the route-scope coverage test.
 - **mgmt-tests (WebdriverIO + Mocha, full stack):**
-  1. Regression first: add `driveToApprovedPendingContact` / `driveToRefusingPendingContact` and a `confirmApplicantContact` helper, and re-compose `driveToApproved` / `driveToRefused` as step 1 + step 2 so existing specs still reach the terminal state. Update the specs that test the decision moment (status push to OJ moves to step 2; Decision email at step 2; hint text) and the page objects (new confirm page, `/approve` reference).
+  1. Regression first: add `driveToApprovedPendingContact` / `driveToRefusedPendingContact` and a `confirmApplicantContact` helper, and re-compose `driveToApproved` / `driveToRefused` as step 1 + step 2 so existing specs still reach the terminal state. Update the specs that test the decision moment (status push to OJ moves to step 2; Decision email at step 2; hint text) and the page objects (new confirm page, `/approve` reference).
   2. Then a new spec, `ra-527-two-step-determination`, covering each step separately for both outcomes: tag and banner after step 1, OJ status **unchanged** after step 1 (`waitForOperatorApplicationStatus`), unticked-box error, Cancel, OJ GRANTED/REFUSED after step 2, Decision email only at step 2 for approvals, and the work-items Status filter.
 - **fe-tests:** no change.
 
@@ -165,7 +165,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 
 ## Further Notes
 
-- **For design to confirm (may change later):** the refusal-path copy (banners and "accreditation is refused") and the "Refusing" tag are extrapolated from Design 3's approval-only screens. The new tag colours ("Approved" light blue, "Refusing" orange) are also provisional.
+- **For design to confirm (may change later):** the refusal-path copy (banners and "accreditation is refused") is extrapolated from Design 3's approval-only screens. The tag wording and colours are decided (task 010) and are not part of this.
 - The ticket's "Log decision" button is today's "Make determination" submit; the code still uses "log decision" naming internally.
 - The Jira comment asking what the new state is called and what its entry/exit rules are is answered by the status model above.
 - Code changes land in the submodules on `feature/ra-527`. After each task, update the parent repo's submodule pointers on its `feature/ra-527` branch so the parent always references the latest task commits.
