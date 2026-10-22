@@ -26,7 +26,7 @@ Repos: management-be, management-fe, mgmt-tests.
 - Idempotent replay of Refused on `rejected-pending-contact` succeeds. Approved on it gives 409. Confirm-contact on an item already `rejected` is a replay success.
 
 **management-fe**
-- Mirror the state in the module. State badge `rejected-pending-contact` → orange.
+- Mirror the state in the module. State badge `rejected-pending-contact` → orange. Both the "Refusing" label and the orange colour are provisional and may change later, so keep each as a single mapping entry (backend display name, frontend module mirror, badge map, filter label).
 - Detail page in `rejected-pending-contact`:
   - tag "Refusing";
   - a persistent banner, title "Application refused", body "The application was refused. You now need to contact the applicant about the decision.";

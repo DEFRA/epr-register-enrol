@@ -28,7 +28,7 @@ Repos: management-be, management-fe, mgmt-tests.
 
 **management-fe**
 - Mirror the new state and v17 in the module, and register v17 in the detail-template version map.
-- State badge: `approved-pending-contact` → light blue.
+- State badge: `approved-pending-contact` → light blue. The colour is provisional and may change later, so keep it as the single badge-map entry.
 - Detail page in `approved-pending-contact`:
   - status tag "Approved";
   - a persistent green banner on every visit: title "Application approved", body "The application was approved. You now need to contact the applicant about the decision.", then "Accreditation ID: <number>";

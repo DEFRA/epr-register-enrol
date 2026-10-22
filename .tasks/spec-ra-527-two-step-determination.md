@@ -27,7 +27,7 @@ Split the determination into two steps, for both outcomes:
 | Confirm applicant contact (step 2) after approval | existing `approved` → "Granted" (green), terminal | existing `Approved` → "GRANTED", pushed now |
 | Confirm applicant contact (step 2) after refusal | existing `rejected` → "Refused" (red), terminal | existing `Rejected` → "REFUSED", pushed now |
 
-Existing state ids, labels and OJ mappings are unchanged; the only new states are the two pending-contact states. The "Refusing" label is provisional and may be revisited.
+Existing state ids, labels and OJ mappings are unchanged; the only new states are the two pending-contact states. **Provisional:** the "Refusing" label and both new tag colours (light blue / orange) may change later. Keep each as a single label/colour mapping entry, so that changing it is a one-line edit plus test updates.
 
 ## User Stories
 
@@ -165,7 +165,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 
 ## Further Notes
 
-- **For design to confirm:** the refusal-path copy (banners and "accreditation is refused") and the provisional "Refusing" tag are extrapolated from Design 3's approval-only screens.
+- **For design to confirm (may change later):** the refusal-path copy (banners and "accreditation is refused") and the "Refusing" tag are extrapolated from Design 3's approval-only screens. The new tag colours ("Approved" light blue, "Refusing" orange) are also provisional.
 - The ticket's "Log decision" button is today's "Make determination" submit; the code still uses "log decision" naming internally.
 - The Jira comment asking what the new state is called and what its entry/exit rules are is answered by the status model above.
 - Code changes land in the submodules on `feature/ra-527`. After each task, update the parent repo's submodule pointers on its `feature/ra-527` branch so the parent always references the latest task commits.
