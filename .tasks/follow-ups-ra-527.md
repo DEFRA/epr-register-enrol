@@ -14,7 +14,7 @@ This file is not a task, and the AFK runner ignores it. Raise any item below as 
 | `lib/epr-register-enrol-mgmt-tests` | `feature/ra-527` | `6040184` |
 | `lib/epr-register-enrol-backend` (operator backend) | `feature/ra-527` | `bd824d4` |
 
-Working trees are clean. Every task ran unit tests, lint and format checks. **No browser (e2e) spec has run yet**, because the dev container has no Docker. The first full run is part of task 011.
+Working trees are clean. Every task ran unit tests, lint and format checks. **No browser (e2e) spec has run yet**, because the dev container has no Docker access, by design. The first full run is part of task 011. A human runs it on the host, and Claude reads the log from `.e2e-logs/`. The commands are in task 011, under "Running the browser suite".
 
 ## For the sign-off (task 011)
 
