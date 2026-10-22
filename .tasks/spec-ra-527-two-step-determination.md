@@ -75,7 +75,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 34. As a regulator, I want the Outcome box to read "This work item is in a final state. No further decision actions are available." with the Granted/Refused tag, so that the final outcome is clear.
 35. As a regulator, I want "Applicant contacted" recorded in the application history with who confirmed it and when, so that there is an audit trail of the contact confirmation.
 36. As a regulator, if the push to the operator fails when I confirm contact, I want an error and no state, SLA, outcome audit, publishing or email change in CM, so that CM and OJ never disagree and I can simply retry by confirming again. The existing `status-push-failed` entry ("Status failed to send to the Registration & Accreditation service") is still written, as on `main`; it is shown to regulators.
-37. As a regulator, I want retrying confirm contact after a failure to be safe, so that a transient failure never corrupts the work item. Known gap (also on `main`, follow-up tracked separately): if the push is delivered but the CM write then fails, a retry sends a new `OccurredAt`, OJ answers 409, and the item needs manual intervention.
+37. As a regulator, I want retrying confirm contact after a failure to be safe, so that a transient failure never corrupts the work item. If the push is delivered but the CM write then fails, a retry sends a new `OccurredAt`; OJ, already at that final status, answers 200 with no change (task 008 closed this gap, which also existed on `main`: OJ used to answer 409 and the item needed manual intervention), so the retry goes on to make the CM write.
 38. As an operator, I want to receive the automated Decision email for an approval only after the regulator confirms contact, so that the email arrives alongside my GRANTED status.
 39. As an operator, I want no automated email for a refusal (as today), so that the regulator's own notice is the only communication.
 40. As a regulator, I want the SLA clock stopped when I confirm contact for an approval, so that the SLA ends when the outcome is applied. Refusals do not stop the SLA clock, matching `main`, where the single-step refuse never stopped it (task 007).
@@ -126,7 +126,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
   1. **Pre-commit push to OJ** (existing decision push with its larger retry pipeline): to-state `approved` or `rejected`, from-state the pending state, with a single `OccurredAt` timestamp. On failure: 500 (upstream notification failed) and no state, SLA, outcome audit, publishing or email change; the existing `status-push-failed` entry is written, as on `main`. The regulator retries by confirming again. Every check that could refuse the write, including payload readability, runs before this push (task 007).
   2. **Single CM write**: terminal state and audit entries ("Applicant contacted" with the acting user, plus action-applied). For approvals also: SLA clock stopped (`StoppedAt` = the same timestamp), `accreditationYear` (configured year) and `accreditationStartDate` (from this step's timestamp) stamped, the sla-clock-stopped and accreditation-issued entries, and publishing enqueued (as today's approve path does). Refusals do not stop the SLA clock (task 007, matching `main`).
   3. **Post-action hooks**: the Decision Notify email for approvals only (unchanged template and personalisation). No email for refusals (RA-211 behaviour retained).
-- Retry safety: an item already in the target terminal state replays as success. Known gap (task 007; also true on `main`, follow-up tracked separately): if the push is delivered but the CM write then fails, a retry sends a new `OccurredAt`, OJ answers 409 (which the push adapter treats as a failure), and the item needs manual intervention.
+- Retry safety: an item already in the target terminal state replays as success. If the push is delivered but the CM write then fails, a retry sends a new `OccurredAt`; OJ answers 200 with no change for a repeat of the final status it already has, so the push adapter treats it as delivered and the retry makes the CM write (task 008, user decision; the gap also existed on `main`, where OJ answered 409 and the item needed manual intervention). OJ still answers 409 for a different final status or a withdrawn application, and its ordering watermark does not advance on the repeat.
 - management-fe's backend client gets a `confirmApplicantContact` call that uses the existing longer decision timeout (the pre-commit push retries for up to ~28s).
 
 ### management-fe UI
@@ -141,7 +141,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 - Delete the RA-132 `POST …/re-accreditation/{id}/approve` endpoint, its handler and tests in management-be; delete the frontend backend-client wrapper and its tests; and remove or adjust the mgmt-tests page-object reference. management-fe and management-be are always released together, so there is no compatibility concern.
 
 ### Unchanged
-- The OJ backend (status mapping ignores from-state; number endpoint unchanged), the OJ frontend (labels, terminal locking, due date — the due date is read live from CM's fixed SLA `DueAt`, which stopping the clock does not change) and fe-tests. No Welsh/i18n work: CM has no locale files and OJ copy is unchanged.
+- The OJ backend (status mapping ignores from-state; number endpoint unchanged; the one exception is task 008, where a case-management status push repeating the final status the application already has returns 200 with no change instead of 409), the OJ frontend (labels, terminal locking, due date — the due date is read live from CM's fixed SLA `DueAt`, which stopping the clock does not change) and fe-tests. No Welsh/i18n work: CM has no locale files and OJ copy is unchanged.
 
 ## Testing Decisions
 
@@ -156,7 +156,7 @@ Existing state ids, labels and OJ mappings are unchanged; the only new states ar
 
 ## Out of Scope
 
-- Any change to the OJ backend, the OJ frontend or fe-tests.
+- Any change to the OJ backend (except task 008's idempotent repeat of a final-status push), the OJ frontend or fe-tests.
 - Changing the existing terminal labels ("Granted", "Refused"), OJ labels, or Decision email template/personalisation.
 - Backfilling or migrating historic decided work items.
 - The other RA-613 tickets (RA-576 duly-made payment date; RA-595 is already on main).
