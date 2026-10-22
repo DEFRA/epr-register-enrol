@@ -28,3 +28,4 @@ A human-in-the-loop check that RA-527 works end to end, matches the design, and 
 - `.tasks/001-AFK-Low-remove-bespoke-approve-endpoint.md`
 - `.tasks/008-AFK-Low-operator-final-status-push-idempotent.md`
 - `.tasks/009-AFK-Medium-e2e-two-step-determination-spec.md`
+- `.tasks/010-AFK-Low-pending-state-labels-and-colours.md`
