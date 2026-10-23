@@ -9,3 +9,4 @@
 /.claude/settings.json
 .env
 .DS_Store
+.e2e-logs/
