@@ -5,6 +5,7 @@
 .beads-credential-key
 .beads/
 .beads.embedded.bak/
+.beads.gate.lock*
 /.vs
 /.claude/settings.json
 .env
