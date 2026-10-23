@@ -11,3 +11,4 @@
 .env
 .DS_Store
 .e2e-logs/
+.tasks/
