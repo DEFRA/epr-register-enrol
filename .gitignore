@@ -5,10 +5,8 @@
 .beads-credential-key
 .beads/
 .beads.embedded.bak/
-.beads.gate.lock*
 /.vs
 /.claude/settings.json
 .env
 .DS_Store
-.e2e-logs/
 .tasks/
