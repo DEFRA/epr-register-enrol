@@ -193,6 +193,7 @@ services:
       ReExApi__BaseUrl: ""
       REEX_API_BASIC_AUTH_USERNAME: ""
       REEX_API_BASIC_AUTH_PASSWORD: ""
+      DevSeedData__Enabled: "true"
     depends_on:
       floci:
         condition: service_healthy
