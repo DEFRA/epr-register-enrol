@@ -194,6 +194,8 @@ services:
       REEX_API_BASIC_AUTH_USERNAME: ""
       REEX_API_BASIC_AUTH_PASSWORD: ""
       DevSeedData__Enabled: "true"
+      # RA-425: the registration status endpoint the /manage pages read.
+      FeatureFlags__InYearChangesEnabled: "true"
     depends_on:
       floci:
         condition: service_healthy
