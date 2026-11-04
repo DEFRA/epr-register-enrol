@@ -258,7 +258,7 @@ services:
       API_BASE_URL: http://epr-register-enrol-backend:8080
       API_STUB_ENABLED: false
       REGULATOR_QUERY_TEXT_DISABLED: true
-      # RA-425: the /manage material dashboard and current-accreditation pages.
+      # RA-425: the /manage current-accreditation pages.
       IN_YEAR_CHANGES_ENABLED: true
       API_TIMEOUT: 5000
       ASPNETCORE_ENVIRONMENT: Development
