@@ -64,14 +64,19 @@ api() {
 
 branch=$(git branch --show-current)
 if [[ -n $pr ]]; then
-  pr_json=$(gh pr view "$pr" --json number,headRefName,baseRefName)
+  pr_json=$(gh pr view "$pr" --json number,state,headRefName,baseRefName)
 else
-  pr_json=$(gh pr view --json number,headRefName,baseRefName 2>/dev/null) ||
+  pr_json=$(gh pr view --json number,state,headRefName,baseRefName 2>/dev/null) ||
     die "no open PR for branch ${branch:-(detached HEAD)} — open one (a draft is fine) or pass --pr <number>"
 fi
 pr=$(jq -r .number <<<"$pr_json")
 pr_branch=$(jq -r .headRefName <<<"$pr_json")
 pr_base=$(jq -r .baseRefName <<<"$pr_json")
+# gh also finds merged and closed PRs for a branch; scanning one would only
+# overwrite its final result.
+pr_state=$(jq -r .state <<<"$pr_json")
+$report_only || [[ $pr_state == OPEN ]] ||
+  die "PR #$pr is ${pr_state,,} — open a new PR for this branch, or pass --pr <number>"
 $report_only || [[ $pr_branch == "$branch" ]] ||
   echo "sonar: note — scanning this working tree as PR #$pr (head $pr_branch), which is not the checked-out branch" >&2
 
