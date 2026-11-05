@@ -1,0 +1,8 @@
+# Snapshot output, dumps and reports contain personal data. Never commit them.
+*.jsonl
+*.jsonl*
+*.archive
+*.archive.*
+*.enc
+*.gz
+out/
