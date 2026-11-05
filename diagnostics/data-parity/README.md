@@ -93,6 +93,3 @@ Notes:
 
 `node --test scripts/test/compare.test.mjs` (unit tests, no database needed). The snapshot scripts were also dry-run with
 mongosh against throwaway local databases seeded with known divergences; exactly those rows were reported.
-
-Still to do before the production run: the full compose-based run through the real submit/resume endpoints, the
-`BuildPayload` zero-difference control from the plan (section 6), and a run with a read-only user.
