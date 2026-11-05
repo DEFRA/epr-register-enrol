@@ -215,6 +215,40 @@ docker compose down -v          # from lib/epr-register-enrol-fe-tests
 cd ../.. && docker compose up --wait -d   # restart the root dev stack
 ```
 
+## Running the SonarCloud scan locally
+
+`scripts/sonar.sh` runs the same SonarCloud pull-request analysis CI runs, from
+your machine, and prints the quality gate, issues, security hotspots and files
+with uncovered or duplicated new lines. The analysis runs on SonarCloud, so the
+quality profiles and quality gate are the ones CI uses. It scans your working
+tree, uncommitted changes included, so you can check a fix without pushing.
+
+```bash
+scripts/sonar.sh frontend        # or management-fe, backend, management-be
+cd lib/epr-register-enrol-backend && ../../scripts/sonar.sh   # repo from cwd
+scripts/sonar.sh backend --report-only   # print the PR's latest result, no scan
+```
+
+It runs the tests first for coverage, exactly as CI does (`npm test`, or
+`dotnet build` then `dotnet test` under `dotnet-coverage`). The exit code is 0
+when the gate passes and 1 when it fails.
+
+Before your first run:
+
+1. Get a SonarCloud token from an account that is a member of the `defra` org:
+   <https://sonarcloud.io/account/security>.
+2. Add `SONAR_TOKEN: <token>` to the root `.env` (worktrees fall back to the
+   main checkout's `.env`), or export it.
+3. Open a PR for your branch (a draft is fine). SonarCloud judges new code
+   against the PR's base, so the scan needs one; pass `--pr <number>` to pick
+   it yourself.
+
+A local scan replaces the PR's SonarCloud result, and its check on GitHub,
+until CI scans again. The scanners download their own JRE, so Java is not
+needed; the .NET repos need the .NET 10 SDK. The .NET scanner settings are
+read from each repo's `.github/workflows/sonarcloud.yml`, so a change there
+applies to local runs too.
+
 ## Troubleshooting
 
 - **Submodule directory is empty** — run
