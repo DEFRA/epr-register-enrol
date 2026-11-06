@@ -217,37 +217,32 @@ cd ../.. && docker compose up --wait -d   # restart the root dev stack
 
 ## Running the SonarCloud scan locally
 
-`scripts/sonar.sh` runs the same SonarCloud pull-request analysis CI runs, from
-your machine, and prints the quality gate, issues, security hotspots and files
-with uncovered or duplicated new lines. The analysis runs on SonarCloud, so the
-quality profiles and quality gate are the ones CI uses. It scans your working
-tree, uncommitted changes included, so you can check a fix without pushing.
+Each repo CI scans with SonarCloud (`backend`, `frontend`, `management-be`,
+`management-fe`) has its own `scripts/sonar.sh`. It runs the same pull-request
+analysis CI runs, from your machine, and prints the quality gate, issues,
+security hotspots and files with uncovered or duplicated new lines. The full
+instructions are in each repo's README, under the same heading.
 
 ```bash
-scripts/sonar.sh frontend        # or management-fe, backend, management-be
-cd lib/epr-register-enrol-backend && ../../scripts/sonar.sh   # repo from cwd
-scripts/sonar.sh backend --report-only   # print the PR's latest result, no scan
+cd lib/epr-register-enrol-frontend && scripts/sonar.sh   # scan as this branch's open PR
+scripts/sonar.sh frontend --report-only                  # same, from the root: print the PR's latest result
 ```
 
-It runs the tests first for coverage, exactly as CI does (`npm test`, or
-`dotnet build` then `dotnet test` under `dotnet-coverage`). The exit code is 0
-when the gate passes and 1 when it fails.
+Set up a token once per machine; every repo and worktree then finds it:
 
-Before your first run:
+1. Sign in at <https://sonarcloud.io> with GitHub, and generate a token at
+   <https://sonarcloud.io/account/security>. Your account must be in the
+   `defra` org; if it isn't, ask a DEFRA SonarCloud org admin.
+2. Save it, readable only by you, without it reaching your shell history:
 
-1. Get a SonarCloud token from an account that is a member of the `defra` org:
-   <https://sonarcloud.io/account/security>.
-2. Add `SONAR_TOKEN: <token>` to the root `.env` (worktrees fall back to the
-   main checkout's `.env`), or export it.
-3. Open a PR for your branch (a draft is fine). SonarCloud judges new code
-   against the PR's base, so the scan needs one; pass `--pr <number>` to pick
-   it yourself.
+   ```bash
+   mkdir -p ~/.config/sonarcloud && (umask 077 && read -rsp 'Token: ' t && echo "$t" > ~/.config/sonarcloud/token); echo
+   ```
 
-A local scan replaces the PR's SonarCloud result, and its check on GitHub,
-until CI scans again. The scanners download their own JRE, so Java is not
-needed; the .NET repos need the .NET 10 SDK. The .NET scanner settings are
-read from each repo's `.github/workflows/sonarcloud.yml`, so a change there
-applies to local runs too.
+3. Check it: `scripts/sonar.sh frontend --check-token` prints `token OK`.
+
+An exported `SONAR_TOKEN` takes precedence over the file. Agents never set up
+a token: if a scan says there is none, they stop and ask.
 
 ## Troubleshooting
 
