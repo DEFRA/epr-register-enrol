@@ -198,6 +198,7 @@ docker run --rm \
   --entrypoint bash \
   -e CHROMEDRIVER_URL=selenium-chrome \
   -e BASE_URL=http://epr-register-enrol-frontend:3000 \
+  -e API_BASE_URL=http://epr-register-enrol-backend:8080 \
   epr-fe-tests -c "rm -rf allure-results allure-report && npx wdio run wdio.github.conf.js"
 ```
 
