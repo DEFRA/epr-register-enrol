@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe } from './describe.mjs'
 import { toCompactCsv } from './compact.mjs'
+import { markdownToPdf } from './pdf.mjs'
 
 export const SCRIPT_VERSION = 1
 export const SECTIONS = [
@@ -391,7 +392,7 @@ function main(argv) {
   mkdirSync(outDir, { recursive: true })
   writeFileSync(join(outDir, 'parity-report.csv'), toCompactReport(result.rows, { includePii }))
   writeFileSync(join(outDir, 'parity-report-detailed.csv'), toCsv(result.rows, { includePii }))
-  writeFileSync(join(outDir, 'parity-summary.md'), toSummary(result, meta))
+  writeFileSync(join(outDir, 'parity-summary.pdf'), markdownToPdf(toSummary(result, meta)))
   // The JSON keeps full values and so contains PII; only write it when asked.
   if (includePii) writeFileSync(join(outDir, 'parity-report.json'), JSON.stringify(result.rows, null, 2))
   console.error(`${result.rows.length} rows written to ${outDir}`)

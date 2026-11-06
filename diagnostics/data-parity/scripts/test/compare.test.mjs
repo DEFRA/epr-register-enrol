@@ -283,7 +283,7 @@ test('compact report: one row per application with every issue in a single cell'
 
 test('--include-pii is refused without an approver and the approver is recorded in the summary', async () => {
   const { spawnSync } = await import('node:child_process')
-  const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs')
+  const { mkdtempSync, writeFileSync, readFileSync, existsSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const dir = mkdtempSync(join(tmpdir(), 'parity-pii-'))
   const trailer = (service) => JSON.stringify({ trailer: true, service, count: 0, takenAt: '2026-11-05T10:00:00.000Z', scriptVersion: 1, window: { start: null, end: null } })
@@ -297,7 +297,11 @@ test('--include-pii is refused without an approver and the approver is recorded 
   assert.equal(run('--include-pii', '--approved-by').status, 2)
   const ok = run('--include-pii', '--approved-by', 'J Smith DPO-1')
   assert.equal(ok.status, 0)
-  assert.match(readFileSync(join(dir, 'out', 'parity-summary.md'), 'utf8'), /Approved by: J Smith DPO-1/)
+  const pdf = readFileSync(join(dir, 'out', 'parity-summary.pdf'), 'latin1')
+  assert.ok(pdf.startsWith('%PDF-1.4'))
+  assert.match(pdf, /UNMASKED PERSONAL DATA/)
+  assert.match(pdf, /DPO-1/)
+  assert.equal(existsSync(join(dir, 'out', 'parity-summary.md')), false)
   assert.equal(run().status, 0)
 })
 

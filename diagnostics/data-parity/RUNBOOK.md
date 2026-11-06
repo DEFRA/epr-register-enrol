@@ -18,7 +18,7 @@ These files contain names, emails, phone numbers and addresses from production. 
   after the dump (use a shorter limit if your data owner sets one). Record the deletion in one line:
   `deleted <files> on <date> by <name>`.
 - **Sharing the report:** use only the channel approved by the data owner, to a named recipient list. Prefer sharing
-  `parity-summary.md`. Emails are masked in the reports, but names, phone numbers and addresses are not.
+  `parity-summary.pdf`. Emails are masked in the reports, but names, phone numbers and addresses are not.
 
 ## 1. Dump (in CDP)
 
@@ -107,7 +107,7 @@ controlled follow-up and delete the output as soon as it is done.
 The compare refuses a file with a missing or mismatched trailer count, the wrong service or an unsupported script
 version, and warns if the two files used different windows. Outputs in `./out`:
 
-- `parity-summary.md`: counts, window, warnings.
+- `parity-summary.pdf`: counts, window, warnings (A4, written by `scripts/pdf.mjs` with no dependencies).
 - `parity-report.csv`: one row per application; the `issues` cell lists everything that differs.
 - `parity-report-detailed.csv`: one row per difference, for filtering and pivoting.
 

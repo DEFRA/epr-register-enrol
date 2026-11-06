@@ -9,7 +9,8 @@ Read-only, point-in-time comparison of every application submitted from OJ (`epr
 | --- | --- |
 | `scripts/oj-snapshot.js` | mongosh, OJ `accreditationApplications` -> JSONL |
 | `scripts/cm-snapshot.js` | mongosh, CM `workItems` (`re-accreditation`) -> JSONL |
-| `scripts/compare.mjs` | Offline diff -> CSV + summary |
+| `scripts/compare.mjs` | Offline diff -> CSV + PDF summary |
+| `scripts/pdf.mjs` | Renders the summary to PDF (standard fonts, no dependencies) |
 | `scripts/src/` | Sources. The two snapshot scripts are **generated** (`node scripts/build.mjs`) so both share one normaliser. Edit `src/`, rebuild, commit both. |
 
 Both snapshot scripts replace every write method on the collection with a throw. The team has confirmed that the legacy
@@ -91,5 +92,5 @@ Notes:
 
 ## Tests
 
-`node --test scripts/test/compare.test.mjs` (unit tests, no database needed). The snapshot scripts were also dry-run with
+`node --test scripts/test/*.test.mjs` (unit tests, no database needed). The snapshot scripts were also dry-run with
 mongosh against throwaway local databases seeded with known divergences; exactly those rows were reported.
