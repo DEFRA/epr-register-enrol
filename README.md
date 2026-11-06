@@ -215,6 +215,35 @@ docker compose down -v          # from lib/epr-register-enrol-fe-tests
 cd ../.. && docker compose up --wait -d   # restart the root dev stack
 ```
 
+## Running the SonarCloud scan locally
+
+Each repo CI scans with SonarCloud (`backend`, `frontend`, `management-be`,
+`management-fe`) has its own `scripts/sonar.sh`. It runs the same pull-request
+analysis CI runs, from your machine, and prints the quality gate, issues,
+security hotspots and files with uncovered or duplicated new lines. The full
+instructions are in each repo's README, under the same heading.
+
+```bash
+cd lib/epr-register-enrol-frontend && scripts/sonar.sh   # scan as this branch's open PR
+scripts/sonar.sh frontend --report-only                  # same, from the root: print the PR's latest result
+```
+
+Set up a token once per machine; every repo and worktree then finds it:
+
+1. Sign in at <https://sonarcloud.io> with GitHub, and generate a token at
+   <https://sonarcloud.io/account/security>. Your account must be in the
+   `defra` org; if it isn't, ask a DEFRA SonarCloud org admin.
+2. Save it, readable only by you, without it reaching your shell history:
+
+   ```bash
+   mkdir -p ~/.config/sonarcloud && (umask 077 && read -rsp 'Token: ' t && echo "$t" > ~/.config/sonarcloud/token); echo
+   ```
+
+3. Check it: `scripts/sonar.sh frontend --check-token` prints `token OK`.
+
+An exported `SONAR_TOKEN` takes precedence over the file. Agents never set up
+a token: if a scan says there is none, they stop and ask.
+
 ## Troubleshooting
 
 - **Submodule directory is empty** — run
