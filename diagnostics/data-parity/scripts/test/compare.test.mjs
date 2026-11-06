@@ -300,3 +300,12 @@ test('--include-pii is refused without an approver and the approver is recorded 
   assert.match(readFileSync(join(dir, 'out', 'parity-summary.md'), 'utf8'), /Approved by: J Smith DPO-1/)
   assert.equal(run().status, 0)
 })
+
+test('known glassRecyclingProcess label/code pairs (OJ Remelt/Other vs CM glass_re_melt/glass_other) are not differences', () => {
+  for (const [oj, cm] of [['Remelt', 'glass_re_melt'], ['Other', 'glass_other']]) {
+    const r = run(rec('OJ', payload(details({ glassRecyclingProcess: oj }))), rec('CM', payload(details({ glassRecyclingProcess: cm })), { state: 'duly-made' }))
+    assert.deepEqual(r.rows.filter((x) => x.fieldPath === 'application.glassRecyclingProcess'), [])
+  }
+  const bad = run(rec('OJ', payload(details({ glassRecyclingProcess: 'Remelt' }))), rec('CM', payload(details({ glassRecyclingProcess: 'glass_other' })), { state: 'duly-made' }))
+  assert.equal(bad.rows.filter((x) => x.fieldPath === 'application.glassRecyclingProcess').length, 1)
+})

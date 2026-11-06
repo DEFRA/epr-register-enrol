@@ -68,11 +68,21 @@ export function parseSnapshot(text, label, expectedService) {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
+// Known representation differences that are not real differences: OJ label -> CM code.
+const KNOWN_EQUIVALENT = {
+  glassRecyclingProcess: { Other: 'glass_other', Remelt: 'glass_re_melt' }
+}
+
+const knownEquivalent = (path, o, c) => {
+  const map = KNOWN_EQUIVALENT[path.split('.').pop()]
+  return map !== undefined && typeof o === 'string' && map[o] === c
+}
+
 // Compares two already-normalised section values and yields difference rows (no application context).
 function diffSection(section, oj, cm) {
   const out = []
   const value = (path, o, c) => {
-    if (!same(o, c)) out.push({ differenceType: 'VALUE_DIFF', fieldPath: path, ojValue: o, cmValue: c })
+    if (!same(o, c) && !knownEquivalent(path, o, c)) out.push({ differenceType: 'VALUE_DIFF', fieldPath: path, ojValue: o, cmValue: c })
   }
   const listDiff = (ojList, cmList, keyOf, prefix, onPair) => {
     const o = new Map(ojList.map((x) => [keyOf(x), x]))
