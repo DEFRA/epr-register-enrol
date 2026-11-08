@@ -107,7 +107,12 @@ controlled follow-up and delete the output as soon as it is done.
 The compare refuses a file with a missing or mismatched trailer count, the wrong service or an unsupported script
 version, and warns if the two files used different windows. Outputs in `./out`:
 
-- `parity-summary.pdf`: counts, window, warnings (A4, written by `scripts/pdf.mjs` with no dependencies).
+- `parity-summary.pdf`: counts, window, warnings; applications by OJ status and CM state (count and %); applications
+  with differences counted by number of sections affected (each counted once), by issue, by section, and by section and
+  issue; top differing applications with a one-line
+  summary of where their differences are (A4, written by `scripts/pdf.mjs` with no
+  dependencies). Row breakdowns each total the quoted number of difference rows. List items present on one side only
+  (`ITEM_MISSING_CM` / `ITEM_MISSING_OJ`) are left out of the summary but kept in the CSVs.
 - `parity-report.csv`: one row per application; the `issues` cell lists everything that differs.
 - `parity-report-detailed.csv`: one row per difference, for filtering and pivoting.
 

@@ -171,11 +171,9 @@ class Layout {
     const [header, ...body] = rows
     const cols = Math.max(...rows.map((r) => r.length))
     const isNumber = (s) => /^-?\d[\d,]*(\.\d+)?%?$/.test(s.trim())
-    // Natural column widths, then scaled down to the page width if they do not fit.
     const natural = Array.from({ length: cols }, (_, c) =>
       Math.max(...rows.map((r, i) => lineWidth(words(r[c] ?? '', i === 0), TABLE))) + 2 * PAD)
-    const total = natural.reduce((a, b) => a + b, 0)
-    const widths = total > CONTENT_W ? natural.map((w) => (w * CONTENT_W) / total) : natural
+    const widths = fitColumns(natural)
     const lead = TABLE * 1.3
 
     const drawRow = (cells, isHeader) => {
@@ -209,7 +207,20 @@ class Layout {
   }
 }
 
-const splitRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+// Fits natural column widths to the page. When too wide, only the widest column is narrowed (and wraps), so short
+// columns such as numbers, counts, states and references stay on one line. Only if the other columns alone leave the
+// widest one less than MIN_WRAP_COL are all columns scaled down together.
+const MIN_WRAP_COL = 80
+export function fitColumns(natural, available = CONTENT_W) {
+  const total = natural.reduce((a, b) => a + b, 0)
+  if (total <= available) return natural
+  const widest = natural.indexOf(Math.max(...natural))
+  const rest = total - natural[widest]
+  if (available - rest >= MIN_WRAP_COL) return natural.map((w, i) => (i === widest ? available - rest : w))
+  return natural.map((w) => (w * available) / total)
+}
+
+const splitRow =(line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
 const isSeparator = (line) => splitRow(line).every((c) => /^:?-{3,}:?$/.test(c))
 
 export function markdownToPdf(md) {

@@ -59,6 +59,18 @@ status push is tagged). Filter on `likelyCause`:
 - `cm-edited-operation-codes` - CM users may change recycling codes by design.
 - `oj-edit-not-resubmitted` / `oj-post-decision-edit` - OJ changed after CM last did; the snapshot gap or a mid-edit.
 
+When none of those apply, every difference row still gets one fallback cause, taken from the row itself (first that
+fits):
+
+- `not-transferred-to-cm` - OJ application with no CM work item (`MISSING_IN_CM`).
+- `cm-only-work-item` - CM work item with no OJ application (`MISSING_IN_OJ`).
+- `id-link-broken` - the OJ and CM IDs do not point at each other (`IDENTITY_BREAK`).
+- `changed-between-snapshots` - OJ or CM changed after the first snapshot was taken, before the second.
+- `cm-edited-after-submission` - CM was last changed after OJ was.
+- `section-not-transferred` - a whole section is on one side only (`SECTION_ABSENT_*`).
+- `transfer-or-mapping-difference` - none of the above: OJ and CM hold different values and no later edit explains it.
+  These are the rows to look at first for transfer or mapping defects.
+
 ## What is compared
 
 Everything CM shows the regulator that OJ supplies, except the two columns used to match records (OJ `_id` / CM

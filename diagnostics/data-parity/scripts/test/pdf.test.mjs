@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { markdownToPdf, toWinAnsi } from '../pdf.mjs'
+import { markdownToPdf, toWinAnsi, fitColumns } from '../pdf.mjs'
 
 const asText = (buf) => buf.toString('latin1')
 
@@ -62,4 +62,22 @@ test('a word wider than its table column is split rather than overflowing', () =
   const pieces = [...pdf.matchAll(/\((x+)\) Tj/g)].map((m) => m[1])
   assert.ok(pieces.length > 1)
   assert.equal(pieces.join(''), long)
+})
+
+test('fitColumns narrows only the widest column, keeping short columns on one line', () => {
+  assert.deepEqual(fitColumns([20, 80, 30], 495), [20, 80, 30]) // fits: unchanged
+  assert.deepEqual(fitColumns([20, 80, 30, 900], 495), [20, 80, 30, 365])
+  // The others leave the widest less than 120pt: everything scales together.
+  assert.deepEqual(fitColumns([200, 200, 200], 300), [100, 100, 100])
+})
+
+test('top differing applications: #, Application, CM state and Rows are never wrapped', () => {
+  const where = Array.from({ length: 12 }, (_, i) => `section-${i}: ${i + 1} VALUE_DIFF, 1 COUNT_DIFF`).join('; ')
+  const ref = '507f1f77bcf86cd799439011-a-long-application-reference'
+  const md = ['### Top differing applications', '', '| # | Application | CM state | Rows | Where the differences are |', '| --- | --- | --- | --- | --- |',
+    `| 48 | ${ref} | approved-pending-contact | 1234 | ${where} |`].join('\n')
+  const pdf = asText(markdownToPdf(md))
+  for (const cell of ['48', ref, 'approved-pending-contact', '1234']) assert.ok(pdf.includes(`(${cell}) Tj`), cell)
+  // The long column did wrap onto several lines.
+  assert.ok([...pdf.matchAll(/\/F1 9 Tf [\d.]+ [\d.]+ Td \(([^)]*)\) Tj/g)].filter((m) => m[1].includes('section-')).length > 3)
 })

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compare, decodeText, parseSnapshot, toCsv, SECTIONS } from '../compare.mjs'
+import { compare, decodeText, parseSnapshot, toCsv, toSummary, SECTIONS } from '../compare.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const shared = readFileSync(join(here, '..', 'src', 'shared.js'), 'utf8')
@@ -312,4 +312,151 @@ test('known glassRecyclingProcess label/code pairs (OJ Remelt/Other vs CM glass_
   }
   const bad = run(rec('OJ', payload(details({ glassRecyclingProcess: 'Remelt' }))), rec('CM', payload(details({ glassRecyclingProcess: 'glass_other' })), { state: 'duly-made' }))
   assert.equal(bad.rows.filter((x) => x.fieldPath === 'application.glassRecyclingProcess').length, 1)
+})
+
+test('summary counts applications by state, with identical pairs included under --differences-only', () => {
+  const op = (v) => payload({ businessPlan: plan({ otherPercent: v }) })
+  const oj = [
+    rec('OJ', payload(), { app: 'a1', wi: 'w1' }),
+    rec('OJ', op(1), { app: 'a2', wi: 'w2' }),
+    rec('OJ', payload(), { app: 'a3', wi: 'w3', state: 'Approved' }),
+    rec('OJ', payload(), { app: 'a4', wi: 'w4' })
+  ]
+  const cm = [
+    rec('CM', payload(), { app: 'a1', wi: 'w1', state: 'duly-made' }),
+    // Two differences in two sections, still one application.
+    rec('CM', { ...op(2), samplingPlan: { files: [] } }, { app: 'a2', wi: 'w2', state: 'duly-made' }),
+    rec('CM', payload(), { app: 'a3', wi: 'w3', state: 'queried' })
+  ]
+  const r = run(oj, cm)
+  const md = toSummary(r, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(md, /### OJ applications by status\n\n\| OJ status \| Applications \| % of total \|\n\| --- \| --- \| --- \|\n\| DulyMade \| 3 \| 75\.0% \|\n\| Approved \| 1 \| 25\.0% \|\n\| \*\*Total\*\* \| \*\*4\*\* \| 100\.0% \|/)
+  assert.match(md, /\| duly-made \| 2 \| 66\.7% \|\n\| queried \| 1 \| 33\.3% \|/)
+  // a2 (data), a3 (status), a4 (missing in CM).
+  assert.match(md, /3 applications have at least one difference/)
+  assert.match(md, /\| MISSING_IN_CM \| 1 \| 33\.3% \|/)
+  assert.match(md, /\| STATE_MISMATCH \| 1 \| 33\.3% \|/)
+  assert.match(md, /### By section\n\n.*\n.*\n\| business-plan \| 1 \| 33\.3% \|\n\| sampling-plan \| 1 \| 33\.3% \|\n\| state \| 1 \| 33\.3% \|/)
+  assert.match(md, /\| business-plan \/ VALUE_DIFF \| 1 \| 33\.3% \|/)
+})
+
+test('top differing applications say where the differences are in one line', () => {
+  const ref = (r, applicationReference) => ({ ...r, identity: { ...r.identity, applicationReference } })
+  const op = (v) => payload({ businessPlan: plan({ otherPercent: v, newMarketsPercent: v }) })
+  const oj = [ref(rec('OJ', payload(), { app: 'a1', wi: 'w1' }), 'RA-1'), ref(rec('OJ', payload(), { app: 'a2', wi: 'w2' }), 'RA-2')]
+  const cm = [ref(rec('CM', { ...op(1), samplingPlan: { files: [] } }, { app: 'a1', wi: 'w1', state: 'queried' }), 'RA-1')]
+  const md = toSummary(run(oj, cm), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  const line = (k) => md.split('\n').find((l) => l.includes(`| ${k} |`) && l.split('|').length === 7)
+  assert.match(md, /\| # \| Application \| CM state \| Rows \| Where the differences are \|/)
+  // Numbered from 1, most rows first; CM state before the row count ("-" when there is no CM work item).
+  assert.match(line('RA-1'), /^\| 1 \| RA-1 \| queried \| 3 \| business-plan: 2 VALUE_DIFF; sampling-plan: 1 COUNT_DIFF; status: CM queried maps to OJ Queried, OJ shows DulyMade \|$/)
+  assert.equal(line('RA-2'), '| 2 | RA-2 | - | 1 | MISSING_IN_CM |')
+})
+
+test('row breakdowns each total the quoted number of difference rows, and ITEM_MISSING_* is left out of the summary', () => {
+  const op = (v) => payload({ businessPlan: plan({ otherPercent: v, newMarketsPercent: v }) })
+  const oj = [rec('OJ', payload(), { app: 'a1', wi: 'w1' }), rec('OJ', payload(), { app: 'a2', wi: 'w2' })]
+  // a1: 2 business-plan values, sampling-plan count (+ a hidden ITEM_MISSING_CM), and a status difference; a2: missing in CM.
+  const cm = [rec('CM', { ...op(1), samplingPlan: { files: [] } }, { app: 'a1', wi: 'w1', state: 'queried' })]
+  const r = run(oj, cm)
+  assert.ok(r.rows.some((x) => x.differenceType === 'ITEM_MISSING_CM'), 'still produced for the CSVs')
+  const md = toSummary(r, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.ok(!md.includes('| ITEM_MISSING'))
+  assert.match(md, /ITEM_MISSING_CM \/ ITEM_MISSING_OJ, 1 rows\) are left out of this summary/)
+  assert.match(md, /- Total rows: 5 \(MATCH rows: 0; status rows: 1; difference rows: 4\)/)
+  assert.match(md, /There are 4 difference rows/)
+  const tables = md.split('### ').filter((s) => s.startsWith('Difference rows by'))
+  assert.equal(tables.length, 4)
+  for (const t of tables) assert.match(t, /\| \*\*Total\*\* \| \*\*4\*\* \| 100\.0% \|/, t.split('\n')[0])
+  assert.match(md, /\| \(no section: application missing on one side or identity break\) \| 1 \| 25\.0% \|/)
+  assert.match(md, /\| \(no CM work item\) \| 1 \| 25\.0% \|/)
+})
+
+test('applications by number of sections affected counts each application once and totals the quoted number', () => {
+  const op = (v) => payload({ businessPlan: plan({ otherPercent: v }) })
+  const oj = ['a1', 'a2', 'a3', 'a4', 'a5'].map((app, i) => rec('OJ', payload(), { app, wi: `w${i + 1}` }))
+  const cm = [
+    rec('CM', { ...op(1), samplingPlan: { files: [] } }, { app: 'a1', wi: 'w1', state: 'duly-made' }), // 2 sections
+    rec('CM', op(2), { app: 'a2', wi: 'w2', state: 'queried' }), // 1 section + status: counted under 1 section
+    rec('CM', payload(), { app: 'a3', wi: 'w3', state: 'queried' }), // status only
+    rec('CM', payload(), { app: 'a4', wi: 'w4', state: 'duly-made' }) // identical; a5 is missing in CM
+  ]
+  const md = toSummary(run(oj, cm), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(md, /4 applications have at least one difference/)
+  assert.ok(md.includes([
+    '### By number of sections affected', '', 'Each application is counted once.', '',
+    '| Sections with differences | Applications | % of applications with differences |', '| --- | --- | --- |',
+    '| 1 section | 1 | 25.0% |',
+    '| 2 sections | 1 | 25.0% |',
+    '| Status only (no section differences) | 1 | 25.0% |',
+    '| Missing on one side or identity break only | 1 | 25.0% |',
+    '| **Total** | **4** | 100.0% |'
+  ].join('\n')), md)
+})
+
+test('every difference row gets a likely cause, falling back to what the row itself shows', () => {
+  const op = (v) => payload({ businessPlan: plan({ otherPercent: v }) })
+  const causeOf = (r, type) => r.rows.find((x) => x.differenceType === type).likelyCause
+  const at = (d) => `2026-${d}T00:00:00.000Z`
+
+  // Orphans on either side.
+  const orphans = run([rec('OJ', payload(), { app: 'a1', wi: 'w1' })], [rec('CM', payload(), { app: 'zz', wi: 'zz', state: 'duly-made' })])
+  assert.equal(causeOf(orphans, 'MISSING_IN_CM'), 'not-transferred-to-cm')
+  assert.equal(causeOf(orphans, 'MISSING_IN_OJ'), 'cm-only-work-item')
+
+  // Linked by applicationId only, with a different workItemId.
+  assert.equal(causeOf(run(rec('OJ', payload(), { wi: 'w1' }), rec('CM', payload(), { wi: 'w9', state: 'duly-made' })), 'IDENTITY_BREAK'), 'id-link-broken')
+
+  // A change after the first snapshot was taken (snapshots on 2026-11-04).
+  const late = run(rec('OJ', payload()), rec('CM', op(1), { state: 'duly-made', updatedAt: '2026-11-04T10:02:00.000Z' }))
+  assert.equal(causeOf(late, 'VALUE_DIFF'), 'changed-between-snapshots')
+
+  // CM changed after OJ's last change, well before the snapshots.
+  const cmLater = run(rec('OJ', payload(), { updatedAt: at('01-01') }), rec('CM', op(1), { state: 'duly-made', updatedAt: at('02-01') }))
+  assert.equal(causeOf(cmLater, 'VALUE_DIFF'), 'cm-edited-after-submission')
+
+  // Section present in OJ, missing in CM, no later edits.
+  const { samplingPlan, ...noSampling } = payload()
+  assert.ok(samplingPlan)
+  assert.equal(causeOf(run(rec('OJ', payload()), rec('CM', noSampling, { state: 'duly-made' })), 'SECTION_ABSENT_CM'), 'section-not-transferred')
+
+  // Nothing else explains it.
+  assert.equal(causeOf(run(rec('OJ', payload()), rec('CM', op(1), { state: 'duly-made' })), 'VALUE_DIFF'), 'transfer-or-mapping-difference')
+
+  // A specific signal still wins over the fallback.
+  const queried = run(rec('OJ', payload(), { updatedAt: at('03-01') }), rec('CM', op(1), { state: 'queried', updatedAt: at('02-01') }))
+  assert.equal(causeOf(queried, 'VALUE_DIFF'), 'oj-edit-not-resubmitted')
+
+  const md = toSummary(orphans, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.ok(!md.includes('(none identified)'))
+  assert.match(md, /\| not-transferred-to-cm \| 1 \| 50\.0% \|/)
+})
+
+test('top differing applications lists at most 50, most rows first, ties by application', () => {
+  const ref = (r, applicationReference) => ({ ...r, identity: { ...r.identity, applicationReference } })
+  // 60 OJ applications with no CM work item: one row each, so all tie.
+  const oj = Array.from({ length: 60 }, (_, i) => ref(rec('OJ', payload(), { app: `a${i}`, wi: `w${i}` }), `RA-${String(i).padStart(2, '0')}`))
+  const md = toSummary(run(oj, []), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  const top = md.slice(md.indexOf('### Top differing applications')).split('\n').filter((l) => /^\| \d+ \|/.test(l))
+  assert.equal(top.length, 50)
+  assert.equal(top[0], '| 1 | RA-00 | - | 1 | MISSING_IN_CM |')
+  assert.equal(top[49], '| 50 | RA-49 | - | 1 | MISSING_IN_CM |')
+})
+
+test('top differing applications note says whether the list is complete, and names status-only applications', () => {
+  const ref = (r, applicationReference) => ({ ...r, identity: { ...r.identity, applicationReference } })
+  const meta = { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} }
+  const note = (md) => md.slice(md.indexOf('### Top differing applications')).split('\n')[2]
+  const orphans = (n) => Array.from({ length: n }, (_, i) => ref(rec('OJ', payload(), { app: `a${i}`, wi: `w${i}` }), `RA-${i}`))
+
+  assert.equal(note(toSummary(run(orphans(1), []), meta)), 'Showing all 1 application with difference rows, most rows first.')
+  assert.equal(note(toSummary(run(orphans(50), []), meta)), 'Showing all 50 applications with difference rows, most rows first.')
+  assert.equal(note(toSummary(run(orphans(51), []), meta)),
+    'Showing the top 50 of 51 applications with difference rows, most rows first; the full list is in parity-report.csv.')
+  assert.equal(note(toSummary(run([], []), meta)), 'No applications have difference rows.')
+
+  // One application differs only on status: it cannot be in the table, and the note says so.
+  const statusOnly = run([ref(rec('OJ', payload(), { app: 'aS', wi: 'wS' }), 'RA-S'), ...orphans(2)], [ref(rec('CM', payload(), { app: 'aS', wi: 'wS', state: 'queried' }), 'RA-S')])
+  assert.equal(note(toSummary(statusOnly, meta)),
+    'Showing all 2 applications with difference rows, most rows first. 1 application whose only difference is status is not listed here.')
 })
