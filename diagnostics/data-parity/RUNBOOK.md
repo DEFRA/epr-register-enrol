@@ -28,7 +28,9 @@ These files contain names, emails, phone numbers and addresses from production. 
   after the dump (use a shorter limit if your data owner sets one). Record the deletion in one line:
   `deleted <files> on <date> by <name>`.
 - **Sharing the report:** use only the channel approved by the data owner, to a named recipient list. The shared
-  output is `parity-summary.pdf`, `parity-report.csv` and `parity-report-detailed.csv`. Emails are masked in the reports, but names, phone numbers and addresses are not.
+  output is `parity-summary.pdf`, `parity-report.csv` and `parity-report-detailed.csv`, but the two CSVs carry
+  names, phone numbers and addresses on every row, so share them only once the data owner has agreed to it. Until
+  then, share the PDF only. Emails are masked in the reports, but names, phone numbers and addresses are not.
 
 ## 1. Dump (in CDP)
 
