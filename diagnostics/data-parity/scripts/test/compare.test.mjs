@@ -390,16 +390,26 @@ test('a swapped file (same count, different id) is counted as a difference in th
 })
 
 test('one CM work item is never matched to two OJ applications, and the identical count never goes negative', () => {
-  // a1 and a2 both point at work item w1 (a2 by workItemId only).
-  const r = run(
-    [rec('OJ', payload(), { app: 'a1', wi: 'w1' }), rec('OJ', payload(), { app: 'a2', wi: 'w1' })],
-    [rec('CM', payload(), { app: 'a1', wi: 'w1', state: 'duly-made' })]
-  )
-  assert.equal(r.matched, 1)
-  assert.equal(r.identical, 1)
-  const dup = r.rows.find((x) => x.ojApplicationId === 'a2')
-  assert.equal(dup.differenceType, 'IDENTITY_BREAK')
-  assert.match(dup.cmValue, /already matched to OJ application a1/)
+  // a1 and a2 both point at work item w1 (a2 by workItemId only). a1 matches on both IDs and wins in either order.
+  const a1 = rec('OJ', payload(), { app: 'a1', wi: 'w1' })
+  const a2 = rec('OJ', payload(), { app: 'a2', wi: 'w1' })
+  for (const oj of [[a1, a2], [a2, a1]]) {
+    const r = run(oj, [rec('CM', payload(), { app: 'a1', wi: 'w1', state: 'duly-made' })])
+    assert.equal(r.matched, 1)
+    assert.equal(r.identical, 1)
+    const dup = r.rows.filter((x) => x.ojApplicationId === 'a2')
+    assert.equal(dup.length, 1)
+    assert.equal(dup[0].differenceType, 'IDENTITY_BREAK')
+    assert.match(dup[0].cmValue, /already matched to OJ application a1/)
+    assert.ok(!r.rows.some((x) => x.ojApplicationId === 'a1' && x.differenceType === 'IDENTITY_BREAK'))
+  }
+  // Two work-item-only links to the same work item: the tie goes to the lower application ID, in either order.
+  const b = [rec('OJ', payload(), { app: 'b2', wi: 'w1' }), rec('OJ', payload(), { app: 'b1', wi: 'w1' })]
+  for (const oj of [b, [...b].reverse()]) {
+    const r = run(oj, [rec('CM', payload(), { app: 'zz', wi: 'w1', state: 'duly-made' })])
+    assert.equal(r.matched, 1)
+    assert.match(r.rows.find((x) => x.ojApplicationId === 'b2').cmValue, /already matched to OJ application b1/)
+  }
   // Conflicting links: not counted as matched, so the identical count stays within 0..matched.
   const brk = run(
     [rec('OJ', payload(), { app: 'a1', wi: 'w2' })],

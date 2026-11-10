@@ -197,8 +197,39 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
     if (c.key.applicationId) cmByApp.set(c.key.applicationId, c)
     if (c.key.workItemId) cmByWi.set(c.key.workItemId, c)
   }
-  // CM record -> the OJ application it was matched to, so one work item is never matched to two applications.
+  const links = (oj) => ({
+    byApp: oj.key.applicationId ? cmByApp.get(oj.key.applicationId) : undefined,
+    byWi: oj.key.workItemId ? cmByWi.get(oj.key.workItemId) : undefined
+  })
+  // Pairing is decided before any row is written, so it does not depend on the order of the snapshot files.
+  // CM record -> the OJ record that owns it, so one work item is never matched to two applications.
   const usedBy = new Map()
+  const pairOf = new Map()
+  // Pass 1: application-ID matches. The CM payload carries the OJ application ID, so this is the stronger link, and
+  // OJ application IDs are unique, so no two OJ records compete for a work item here.
+  for (const oj of ojRecords) {
+    const { byApp } = links(oj)
+    if (byApp) {
+      usedBy.set(byApp, oj)
+      pairOf.set(oj, byApp)
+    }
+  }
+  // Pass 2: work-item-ID-only matches for the rest, taken in application ID order so ties are deterministic.
+  const rest = ojRecords.filter((oj) => !pairOf.has(oj))
+  rest.sort((a, b) => String(a.key.applicationId ?? '').localeCompare(String(b.key.applicationId ?? '')))
+  for (const oj of rest) {
+    const { byWi } = links(oj)
+    if (byWi && !usedBy.has(byWi)) {
+      usedBy.set(byWi, oj)
+      pairOf.set(oj, byWi)
+    }
+  }
+  // Pass 3: a work item reached only through a conflicting link is already reported on that IDENTITY_BREAK row,
+  // so it is not reported again as MISSING_IN_OJ.
+  for (const oj of ojRecords) {
+    const { byApp, byWi } = links(oj)
+    if (byApp && byWi && byApp !== byWi && !usedBy.has(byWi)) usedBy.set(byWi, oj)
+  }
   const rows = []
   let matched = 0
   // Matched pairs with no difference in any section (status differences aside).
@@ -233,8 +264,7 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
   }
 
   for (const oj of ojRecords) {
-    const byApp = oj.key.applicationId ? cmByApp.get(oj.key.applicationId) : undefined
-    const byWi = oj.key.workItemId ? cmByWi.get(oj.key.workItemId) : undefined
+    const { byApp, byWi } = links(oj)
     if (!byApp && !byWi) {
       push(oj, null, { differenceType: 'MISSING_IN_CM', fieldPath: oj.key.workItemId ? 'key.workItemId' : '' })
       continue
@@ -246,20 +276,19 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
         ojValue: `workItemId=${oj.key.workItemId}`,
         cmValue: `applicationId match is work item ${byApp.key.workItemId}; workItemId match has applicationId ${byWi.key.applicationId}`
       })
-      for (const c of [byApp, byWi]) if (!usedBy.has(c)) usedBy.set(c, oj.key.applicationId)
       continue
     }
-    const cm = byApp ?? byWi
-    if (usedBy.has(cm)) {
-      push(oj, cm, {
+    const cm = pairOf.get(oj)
+    if (!cm) {
+      // Its only link is by work item ID, and that work item belongs to another OJ application.
+      push(oj, byWi, {
         differenceType: 'IDENTITY_BREAK',
         fieldPath: 'key',
         ojValue: `applicationId=${oj.key.applicationId}`,
-        cmValue: `work item ${cm.key.workItemId} is already matched to OJ application ${usedBy.get(cm)}`
+        cmValue: `work item ${byWi.key.workItemId} is already matched to OJ application ${usedBy.get(byWi).key.applicationId}`
       })
       continue
     }
-    usedBy.set(cm, oj.key.applicationId)
     matched++
     const firstRow = rows.length
     if (!byApp || !byWi) {
