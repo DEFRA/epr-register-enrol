@@ -1,16 +1,18 @@
 # OJ vs CM parity: run book
 
-Compares every application submitted from OJ to CM, using `mongodump` archives restored into a throwaway MongoDB.
-Nothing runs against the live databases. The [README](README.md) explains what is compared and how to read the report.
+Compares every application submitted from OJ to CM. The only step that touches the live databases is the dump (step 1),
+run in the CDP shell with a read-only user against a secondary. Everything after that runs against the archives restored
+into a throwaway MongoDB. The [README](README.md) explains what is compared and how to read the report.
 
 > **Production data: perform every operation in this run book within CDP.** Run the dump (step 1) in the CDP shell.
 > Run restore, snapshot, compare and clean-up (steps 2 to 5) on a **Defra Virtual Desktop (DVD)**. Never move
 > production archives, snapshots or reports to a personal or local machine. The only exception is sharing the report
 > under the "Sharing the report" rule below. A local machine may be used for steps 2 to 5 with non-production data only.
 
-You need Docker, `mongosh`, `openssl` (included with Git for Windows) and Node 18+ wherever steps 2 to 5 run. This run
-book assumes the Defra Virtual Desktop provides all four. If `scripts/src/` has changed, run `node scripts/build.mjs`
-in the scripts folder first.
+You need Docker, `mongosh`, `openssl` (included with Git for Windows) and Node 18+ wherever steps 2 to 5 run. It has not
+yet been confirmed that a Defra Virtual Desktop provides all four (Docker in particular); check before you take the dump,
+and ask the platform team if any is missing. If `scripts/src/` has changed, run `node scripts/build.mjs` in the scripts
+folder first.
 
 ## Handling rules (production data)
 
@@ -19,7 +21,8 @@ These files contain names, emails, phone numbers and addresses from production. 
 - **Production data stays within CDP:** the CDP shell for the dump, then a Defra Virtual Desktop for everything else.
 - **Work outside the repository and outside any synced folder** (for example `C:\secure\parity-<date>` on the Defra
   Virtual Desktop, or on a BitLocker-encrypted disk for non-production data). Never keep archives, snapshots or reports
-  inside the git workspace. `diagnostics/.gitignore` and the Claude Code deny rules are a backstop only.
+  inside the git workspace. `diagnostics/.gitignore` and the Claude Code deny rules are a backstop only: the deny rules
+  stop Claude Code's Read tool, not a shell command such as `cat`, so they do not make the files unreadable.
 - **Do not paste output, files or screenshots into AI tools or chat.** Describe a problem instead.
 - **Retention:** delete the archives, snapshots and reports once the report is signed off, and no later than 14 days
   after the dump (use a shorter limit if your data owner sets one). Record the deletion in one line:
@@ -106,7 +109,7 @@ near zero. If the dumps were taken far apart, treat `oj-edit-not-resubmitted` an
 node "$S/compare.mjs" oj.jsonl cm.jsonl --out ./out
 ```
 
-OJ file first, then CM. Add `--differences-only` to omit matched applications.
+OJ file first, then CM. Without `--out` the reports go to `./out`. Add `--differences-only` to omit matched applications.
 
 `--include-pii` writes unmasked values and `parity-report.json`. It is refused unless you name the approver:
 `--include-pii --approved-by "<approver and ticket>"`. The approver is recorded in the summary. Use it only for a
@@ -118,8 +121,8 @@ version, and warns if the two files used different windows. Outputs in `./out`:
 - `parity-summary.pdf`: counts, window, warnings; applications by OJ status (count and %); applications
   with differences counted by section, and by section and issue; top differing applications with a one-line
   summary of where their differences are (A4, written by `scripts/pdf.mjs` with no
-  dependencies). Row breakdowns each total the quoted number of difference rows. List items present on one side only
-  (`ITEM_MISSING_CM` / `ITEM_MISSING_OJ`) are left out of the summary but kept in the CSVs.
+  dependencies). Row breakdowns each total the quoted number of difference rows, including list items present on one
+  side only (`ITEM_MISSING_CM` / `ITEM_MISSING_OJ`), so a swapped file or site is counted even when the list sizes match.
 - `parity-report.csv`: one row per application; the `issues` cell lists everything that differs.
 - `parity-report-detailed.csv`: one row per difference, for filtering and pivoting.
 

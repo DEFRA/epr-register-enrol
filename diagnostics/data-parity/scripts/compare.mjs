@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe } from './describe.mjs'
-import { toCompactCsv } from './compact.mjs'
+import { toCompactCsv, appKey, csvEscape } from './compact.mjs'
 import { markdownToPdf } from './pdf.mjs'
 
 export const SCRIPT_VERSION = 1
@@ -13,7 +13,7 @@ export const SECTIONS = [
   'application-details', 'business-plan', 'prn-tonnage', 'authority-to-issue', 'sampling-plan', 'overseas-sites', 'bes-evidence'
 ]
 
-// CM stateId -> the OJ applicationStatus it should project to (plan section 3).
+// CM stateId -> the OJ applicationStatus it should project to.
 export const STATE_MAP = {
   submitted: 'Submitted',
   'duly-made': 'DulyMade',
@@ -197,9 +197,12 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
     if (c.key.applicationId) cmByApp.set(c.key.applicationId, c)
     if (c.key.workItemId) cmByWi.set(c.key.workItemId, c)
   }
-  const used = new Set()
+  // CM record -> the OJ application it was matched to, so one work item is never matched to two applications.
+  const usedBy = new Map()
   const rows = []
   let matched = 0
+  // Matched pairs with no difference in any section (status differences aside).
+  let identical = 0
 
   const base = (oj, cm) => ({
     applicationReference: oj?.identity.applicationReference ?? cm?.identity.applicationReference ?? null,
@@ -243,13 +246,22 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
         ojValue: `workItemId=${oj.key.workItemId}`,
         cmValue: `applicationId match is work item ${byApp.key.workItemId}; workItemId match has applicationId ${byWi.key.applicationId}`
       })
-      used.add(byApp)
-      used.add(byWi)
+      for (const c of [byApp, byWi]) if (!usedBy.has(c)) usedBy.set(c, oj.key.applicationId)
       continue
     }
     const cm = byApp ?? byWi
-    used.add(cm)
+    if (usedBy.has(cm)) {
+      push(oj, cm, {
+        differenceType: 'IDENTITY_BREAK',
+        fieldPath: 'key',
+        ojValue: `applicationId=${oj.key.applicationId}`,
+        cmValue: `work item ${cm.key.workItemId} is already matched to OJ application ${usedBy.get(cm)}`
+      })
+      continue
+    }
+    usedBy.set(cm, oj.key.applicationId)
     matched++
+    const firstRow = rows.length
     if (!byApp || !byWi) {
       push(oj, cm, {
         differenceType: 'IDENTITY_BREAK',
@@ -287,9 +299,10 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
         push(oj, cm, { section, differenceType: 'MATCH', fieldPath: section, ojValue: 'identical', cmValue: 'identical', likelyCause: '' })
       }
     }
+    if (!rows.slice(firstRow).some((r) => r.differenceType !== 'MATCH' && r.section !== 'state')) identical++
   }
   for (const c of cmRecords) {
-    if (!used.has(c)) push(null, c, { differenceType: 'MISSING_IN_OJ' })
+    if (!usedBy.has(c)) push(null, c, { differenceType: 'MISSING_IN_OJ' })
   }
   // Counted from the records, not the rows, so identical pairs are included even with --differences-only.
   const byState = (records) => {
@@ -297,24 +310,24 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
     for (const r of records) m.set(r.state?.raw ?? '(none)', (m.get(r.state?.raw ?? '(none)') ?? 0) + 1)
     return m
   }
-  return { rows, matched, gap, ojCount: ojRecords.length, cmCount: cmRecords.length, ojStates: byState(ojRecords) }
+  return { rows, matched, identical, gap, ojCount: ojRecords.length, cmCount: cmRecords.length, ojStates: byState(ojRecords) }
 }
 
 // ---------- output ----------
 
-const maskEmail = (e) => e.replace(/([^\s@"',[\]]+)@([^\s@"',[\]]+)/g, (_, l, d) => `${l[0]}***@${d}`)
-const mask = (s) => maskEmail(s)
+// An apostrophe is valid inside the local part (o'neil@x.com), but not as its first character, where it is a quote.
+export const maskEmail = (e) => e.replace(/([^\s@"',[\]][^\s@",[\]]*)@([^\s@"',[\]]+)/g, (_, l, d) => `${l[0]}***@${d}`)
 
 function cell(v, { includePii, truncate }) {
   if (v === null || v === undefined) return ''
   let s = typeof v === 'string' ? v : JSON.stringify(v)
-  if (!includePii) s = mask(s)
+  if (!includePii) s = maskEmail(s)
   if (truncate && s.length > 500) s = s.slice(0, 497) + '...'
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  return csvEscape(s)
 }
 
 // Compact report: one row per application, all issues in one cell.
-export const toCompactReport = (rows, { includePii = false } = {}) => toCompactCsv(rows, { includePii, mask })
+export const toCompactReport = (rows, { includePii = false } = {}) => toCompactCsv(rows, { includePii, mask: maskEmail })
 
 export const CSV_COLUMNS = [
   'applicationReference', 'organisationName', 'orgNumber', 'registrationNumber', 'accreditationNumber', 'material',
@@ -353,7 +366,6 @@ const stateTable = (title, label, counts, total) => {
 }
 
 // Counts distinct applications (an OJ/CM pair, or an orphan on either side) per key, not rows.
-const appKey = (r) => `${r.ojApplicationId ?? ''}|${r.cmWorkItemId ?? ''}`
 function appTally(rows, keyFn) {
   const m = new Map()
   for (const r of rows) {
@@ -391,15 +403,10 @@ function statusSection(statusRows) {
   return `### Status differences\n\n${verdict}\n`
 }
 
-const SUMMARY_HIDDEN = new Set(['ITEM_MISSING_CM', 'ITEM_MISSING_OJ'])
-
 const fmtWindow = (w) => (w?.start || w?.end ? `${w.start ?? 'open'} to ${w.end ?? 'open'}` : 'none (all submitted applications)')
 
 export function toSummary(result, meta) {
-  const { matched, ojCount, cmCount } = result
-  // List items present on one side only (keyed by ID) are left out of the summary; the CSVs still carry them.
-  const hidden = result.rows.filter((r) => SUMMARY_HIDDEN.has(r.differenceType))
-  const rows = result.rows.filter((r) => !SUMMARY_HIDDEN.has(r.differenceType))
+  const { matched, identical, ojCount, cmCount, rows } = result
   const matchRows = rows.filter((r) => r.differenceType === 'MATCH')
   const diffRows = rows.filter((r) => r.differenceType !== 'MATCH')
   const diffs = diffRows.filter((r) => !['STATE_MISMATCH', 'STATE_UNMAPPED'].includes(r.differenceType))
@@ -432,9 +439,6 @@ export function toSummary(result, meta) {
         : `${place}: ${[...issues.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n} ${t}`).join(', ')}`),
     ...(statusNote.has(k) ? [statusNote.get(k)] : [])
   ].join('; ')
-  const pairsWithDiffs = new Set(
-    diffs.filter((r) => r.ojApplicationId && r.cmWorkItemId).map((r) => `${r.ojApplicationId}|${r.cmWorkItemId}`)
-  ).size
   const top = [...apps.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))).slice(0, TOP_APPLICATIONS)
   const unmatchedOj = rows.filter((r) => r.differenceType === 'MISSING_IN_CM').length
   const unmatchedCm = rows.filter((r) => r.differenceType === 'MISSING_IN_OJ').length
@@ -504,11 +508,8 @@ export function toSummary(result, meta) {
     `- OJ submitted applications: ${ojCount}; CM re-accreditation work items: ${cmCount}`,
     `- Matched applications (OJ application linked to its CM work item): ${matched}; OJ applications with no CM work item: ${unmatchedOj}; CM work items with no OJ application: ${unmatchedCm}`,
     `- Applications with at least one difference (section, status, or missing on one side): ${issueApps}`,
-    `- Matched applications with no difference in any section (status differences aside): ${matched - pairsWithDiffs} of ${matched}`,
+    `- Matched applications with no difference in any section (status differences aside): ${identical} of ${matched}`,
     `- Total rows: ${rows.length} (MATCH rows: ${matchRows.length}; status rows: ${diffRows.length - diffs.length}; difference rows: ${diffs.length})`,
-    ...(hidden.length
-      ? [`- List items present on one side only (ITEM_MISSING_CM / ITEM_MISSING_OJ, ${hidden.length} rows) are left out of this summary; they are in the CSV reports.`]
-      : []),
     '',
     ...appsSection,
     `### Top differing applications\n\n${topNote(apps.size, statusOnlyApps)}\n\n| # | Application | CM state | Rows | Where the differences are |\n| --- | --- | --- | --- | --- |\n${top.map(([k, n], i) => `| ${i + 1} | ${k} | ${cmStateOf.get(k) ?? '-'} | ${n} | ${whereLine(k)} |`).join('\n') || '| | (none) | | 0 | |'}\n`
@@ -521,7 +522,8 @@ function main(argv) {
   const args = argv.slice(2)
   const files = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out' && args[i - 1] !== '--approved-by')
   const outIdx = args.indexOf('--out')
-  const outDir = outIdx >= 0 ? args[outIdx + 1] : '.'
+  // Defaults to out/, which diagnostics/.gitignore and the Claude Code deny rules cover.
+  const outDir = outIdx >= 0 ? args[outIdx + 1] : 'out'
   const includePii = args.includes('--include-pii')
   const approvedIdx = args.indexOf('--approved-by')
   const approvedBy = approvedIdx >= 0 ? (args[approvedIdx + 1] ?? '').trim() : ''

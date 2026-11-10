@@ -11,13 +11,19 @@ export const COMPACT_COLUMNS = [
   'issues', 'likelyCause', 'ojUpdatedAt', 'cmLastModifiedAt', 'snapshotGapSeconds'
 ]
 
+// One application: an OJ/CM pair, or an orphan on either side.
+export const appKey = (r) => `${r.ojApplicationId ?? ''}|${r.cmWorkItemId ?? ''}`
+
+// Quotes a CSV cell when it holds a quote, comma or line break.
+export const csvEscape = (s) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+
 const plural = (n) => (n === 1 ? '1 difference' : `${n} differences`)
 
 // rows: the output of compare(). Returns one object per application (matched pair or orphan), in first-seen order.
 export function toCompactRows(rows) {
   const groups = new Map()
   for (const r of rows) {
-    const key = `${r.ojApplicationId ?? ''}|${r.cmWorkItemId ?? ''}`
+    const key = appKey(r)
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(r)
   }
@@ -63,8 +69,6 @@ export function toCompactRows(rows) {
   return out
 }
 
-const q = (s) => `"${s.replace(/"/g, '""')}"`
-
 // maskFn masks personal data; the issues cell is never truncated (it is the whole point of the compact report).
 export function toCompactCsv(rows, { includePii = false, mask = (s) => s } = {}) {
   const lines = [COMPACT_COLUMNS.join(',')]
@@ -75,7 +79,7 @@ export function toCompactCsv(rows, { includePii = false, mask = (s) => s } = {})
         if (v === null || v === undefined || v === '') return ''
         let s = typeof v === 'string' ? v : String(v)
         if (!includePii) s = mask(s)
-        return /[",\r\n]/.test(s) ? q(s) : s
+        return csvEscape(s)
       }).join(',')
     )
   }

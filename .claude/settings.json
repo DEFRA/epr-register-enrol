@@ -33,7 +33,9 @@
       "Read(./diagnostics/**/*.jsonl*)",
       "Read(./diagnostics/**/*.archive)",
       "Read(./diagnostics/**/*.enc)",
-      "Read(./diagnostics/**/out/**)"
+      "Read(./diagnostics/**/out/**)",
+      "Read(./diagnostics/**/parity-summary.*)",
+      "Read(./diagnostics/**/parity-report*)"
     ]
   }
 }

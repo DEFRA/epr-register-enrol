@@ -358,28 +358,64 @@ test('top differing applications say where the differences are in one line', () 
   const line = (k) => md.split('\n').find((l) => l.includes(`| ${k} |`) && l.split('|').length === 7)
   assert.match(md, /\| # \| Application \| CM state \| Rows \| Where the differences are \|/)
   // Numbered from 1, most rows first; CM state before the row count ("-" when there is no CM work item).
-  assert.match(line('RA-1'), /^\| 1 \| RA-1 \| queried \| 3 \| business-plan: 2 VALUE_DIFF; sampling-plan: 1 COUNT_DIFF; status: OJ should show Queried \(CM queried\), OJ shows DulyMade \|$/)
+  assert.match(line('RA-1'), /^\| 1 \| RA-1 \| queried \| 4 \| business-plan: 2 VALUE_DIFF; sampling-plan: 1 COUNT_DIFF, 1 ITEM_MISSING_CM; status: OJ should show Queried \(CM queried\), OJ shows DulyMade \|$/)
   assert.equal(line('RA-2'), '| 2 | RA-2 | - | 1 | MISSING_IN_CM |')
 })
 
-test('row breakdowns each total the quoted number of difference rows, and ITEM_MISSING_* is left out of the summary', () => {
+test('row breakdowns each total the quoted number of difference rows, ITEM_MISSING_* included', () => {
   const op = (v) => payload({ businessPlan: plan({ otherPercent: v, newMarketsPercent: v }) })
   const oj = [rec('OJ', payload(), { app: 'a1', wi: 'w1' }), rec('OJ', payload(), { app: 'a2', wi: 'w2' })]
-  // a1: 2 business-plan values, sampling-plan count (+ a hidden ITEM_MISSING_CM), and a status difference; a2: missing in CM.
+  // a1: 2 business-plan values, sampling-plan count + ITEM_MISSING_CM, and a status difference; a2: missing in CM.
   const cm = [rec('CM', { ...op(1), samplingPlan: { files: [] } }, { app: 'a1', wi: 'w1', state: 'queried' })]
-  const r = run(oj, cm)
-  assert.ok(r.rows.some((x) => x.differenceType === 'ITEM_MISSING_CM'), 'still produced for the CSVs')
-  const md = toSummary(r, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
-  assert.ok(!md.includes('| ITEM_MISSING'))
-  assert.match(md, /ITEM_MISSING_CM \/ ITEM_MISSING_OJ, 1 rows\) are left out of this summary/)
-  assert.match(md, /- Total rows: 5 \(MATCH rows: 0; status rows: 1; difference rows: 4\)/)
-  assert.match(md, /There are 4 difference rows/)
+  const md = toSummary(run(oj, cm), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(md, /\| sampling-plan \/ ITEM_MISSING_CM \| 1 \|/)
+  assert.doesNotMatch(md, /left out of this summary/)
+  assert.match(md, /- Total rows: 6 \(MATCH rows: 0; status rows: 1; difference rows: 5\)/)
+  assert.match(md, /There are 5 difference rows/)
   const tables = md.split('### ').filter((s) => s.startsWith('Difference rows by'))
   assert.equal(tables.length, 3)
   assert.ok(!tables.some((t) => t.startsWith('Difference rows by issue')))
-  for (const t of tables) assert.match(t, /\| \*\*Total\*\* \| \*\*4\*\* \| 100\.0% \|/, t.split('\n')[0])
-  assert.match(md, /\| \(no section: application missing on one side or identity break\) \| 1 \| 25\.0% \|/)
-  assert.match(md, /\| \(no CM work item\) \| 1 \| 25\.0% \|/)
+  for (const t of tables) assert.match(t, /\| \*\*Total\*\* \| \*\*5\*\* \| 100\.0% \|/, t.split('\n')[0])
+  assert.match(md, /\| \(no section: application missing on one side or identity break\) \| 1 \| 20\.0% \|/)
+  assert.match(md, /\| \(no CM work item\) \| 1 \| 20\.0% \|/)
+})
+
+test('a swapped file (same count, different id) is counted as a difference in the summary', () => {
+  const cm = payload({ samplingPlan: { files: [{ fileId: 'f2', filename: 'a.pdf', s3Key: 'k1', scanStatus: 'Clean', uploadedAt: '2026-01-01' }] } })
+  const r = run(rec('OJ', payload()), rec('CM', cm, { state: 'duly-made' }))
+  assert.deepEqual(types(r).sort(), ['ITEM_MISSING_CM', 'ITEM_MISSING_OJ'])
+  const md = toSummary(r, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(md, /- Applications with at least one difference \(section, status, or missing on one side\): 1/)
+  assert.match(md, /- Matched applications with no difference in any section \(status differences aside\): 0 of 1/)
+})
+
+test('one CM work item is never matched to two OJ applications, and the identical count never goes negative', () => {
+  // a1 and a2 both point at work item w1 (a2 by workItemId only).
+  const r = run(
+    [rec('OJ', payload(), { app: 'a1', wi: 'w1' }), rec('OJ', payload(), { app: 'a2', wi: 'w1' })],
+    [rec('CM', payload(), { app: 'a1', wi: 'w1', state: 'duly-made' })]
+  )
+  assert.equal(r.matched, 1)
+  assert.equal(r.identical, 1)
+  const dup = r.rows.find((x) => x.ojApplicationId === 'a2')
+  assert.equal(dup.differenceType, 'IDENTITY_BREAK')
+  assert.match(dup.cmValue, /already matched to OJ application a1/)
+  // Conflicting links: not counted as matched, so the identical count stays within 0..matched.
+  const brk = run(
+    [rec('OJ', payload(), { app: 'a1', wi: 'w2' })],
+    [rec('CM', payload(), { app: 'a1', wi: 'w1', state: 'duly-made' }), rec('CM', payload(), { app: 'a2', wi: 'w2', state: 'duly-made' })]
+  )
+  assert.equal(brk.matched, 0)
+  assert.equal(brk.identical, 0)
+  const md = toSummary(brk, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(md, /status differences aside\): 0 of 0/)
+})
+
+test('email masking keeps apostrophes in the local part hidden', async () => {
+  const { maskEmail } = await import('../compare.mjs')
+  assert.equal(maskEmail("john.o'neil@x.com"), 'j***@x.com')
+  assert.equal(maskEmail("'ann@x.com'"), "'a***@x.com'")
+  assert.equal(maskEmail('["ann@x.com","bob@y.com"]'), '["a***@x.com","b***@y.com"]')
 })
 
 test('applications with differences are counted once and the removed breakdown tables are not shown', () => {

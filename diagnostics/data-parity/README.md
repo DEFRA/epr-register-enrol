@@ -14,7 +14,9 @@ Read-only, point-in-time comparison of every application submitted from OJ (`epr
 | `scripts/markdown.mjs` | Parses the summary text for `pdf.mjs` |
 | `scripts/src/` | Sources. The two snapshot scripts are **generated** (`node scripts/build.mjs`) so both share one normaliser. Edit `src/`, rebuild, commit both. |
 
-Both snapshot scripts replace every write method on the collection with a throw. The team has confirmed that the legacy
+The real protection against writes is the read-only database user for the dump and running the snapshots against a
+scratch restore. As a backstop only, both snapshot scripts replace the common write methods on the collection object with
+a throw; that does not cover `aggregate` with `$out`/`$merge`, `db.runCommand` or other databases. The team has confirmed that the legacy
 `accreditationApplications` collection is still the read path (RA-644 dual-write), so OJ is read from it.
 
 ## Scope and window
@@ -95,7 +97,7 @@ does not show them or they are CM's own: assignee, SLA due date, payment date, s
 Notes:
 
 - OJ is projected like `BuildPayload`: only `selected` sites and active interim sites, so an unselected OJ site never
-  appears. `BuildPayload` always sends all four object sections (business plan, PRNs, sampling plan, overseas sites),
+  appears. A site with no `selected` field counts as selected, as `OverseasSiteModel.Selected` defaults to `true`. `BuildPayload` always sends all four object sections (business plan, PRNs, sampling plan, overseas sites),
   using empty defaults when the OJ document has none, so the OJ snapshot does the same and a missing OJ element is not
   reported as a missing section.
 - The charge is not stored in OJ, so the OJ snapshot recomputes it with a port of `AccreditationChargeCalculator`; update

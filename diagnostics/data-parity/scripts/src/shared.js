@@ -163,11 +163,20 @@ function normaliseSections(p) {
   }
   return sections
 }
+function uuidStr(v) {
+  if (v === undefined || v === null) return null
+  if (typeof v.toUUID === 'function') return v.toUUID().toString().replace(/^UUID\("?|"?\)$/g, '')
+  return idStr(v)
+}
+// A backstop only: it replaces the common write methods on this one collection object with a throw. It does not cover
+// aggregate with $out/$merge, db.runCommand, db.getSiblingDB(...) or db.dropDatabase. The real protection is the
+// read-only database user and running against a scratch restore.
 function installReadOnlyGuard(collection, name) {
   const MUTATING = [
     'insert', 'insertOne', 'insertMany', 'update', 'updateOne', 'updateMany', 'replaceOne', 'save',
-    'remove', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete',
-    'bulkWrite', 'drop', 'dropIndex', 'dropIndexes', 'createIndex', 'renameCollection'
+    'remove', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete', 'findAndModify',
+    'bulkWrite', 'initializeOrderedBulkOp', 'initializeUnorderedBulkOp', 'drop', 'dropIndex', 'dropIndexes',
+    'createIndex', 'createIndexes', 'renameCollection'
   ]
   for (const m of MUTATING) {
     collection[m] = function () {
@@ -189,6 +198,13 @@ function parseWindow(startRaw, endRaw) {
   const end = one(endRaw, 'PARITY_END')
   if (start && end && start >= end) throw new Error('PARITY_START must be earlier than PARITY_END')
   return { start, end }
+}
+// The window passed with --eval "PARITY_START=...; PARITY_END=...", if any.
+function windowFromEval() {
+  return parseWindow(
+    typeof PARITY_START !== 'undefined' ? PARITY_START : null,
+    typeof PARITY_END !== 'undefined' ? PARITY_END : null
+  )
 }
 // Mongo range clause for one date field, or null when no bound is set.
 function rangeClause(field, w) {

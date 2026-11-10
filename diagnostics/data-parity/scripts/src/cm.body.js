@@ -14,12 +14,6 @@ installReadOnlyGuard(collection, 'cm-snapshot')
 
 const takenAt = new Date().toISOString()
 
-function uuidStr(v) {
-  if (v === undefined || v === null) return null
-  if (typeof v.toUUID === 'function') return v.toUUID().toString().replace(/^UUID\("?|"?\)$/g, '')
-  return idStr(v)
-}
-
 // Small audit summary so the full audit log is never exported.
 function auditBlock(item) {
   const log = Array.isArray(item.auditLog) ? item.auditLog : []
@@ -38,10 +32,7 @@ function auditBlock(item) {
   }
 }
 
-const win = parseWindow(
-  typeof PARITY_START !== 'undefined' ? PARITY_START : null,
-  typeof PARITY_END !== 'undefined' ? PARITY_END : null
-)
+const win = windowFromEval()
 // Only work items submitted from OJ: those carry the OJ application id in the payload. Items created any other way
 // (seed/legacy/manual, empty or missing operatorApplicationId) are out of scope. The window applies to submittedAt.
 const cmFilter = Object.assign(

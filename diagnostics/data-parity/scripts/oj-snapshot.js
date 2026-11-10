@@ -174,11 +174,20 @@ function normaliseSections(p) {
   }
   return sections
 }
+function uuidStr(v) {
+  if (v === undefined || v === null) return null
+  if (typeof v.toUUID === 'function') return v.toUUID().toString().replace(/^UUID\("?|"?\)$/g, '')
+  return idStr(v)
+}
+// A backstop only: it replaces the common write methods on this one collection object with a throw. It does not cover
+// aggregate with $out/$merge, db.runCommand, db.getSiblingDB(...) or db.dropDatabase. The real protection is the
+// read-only database user and running against a scratch restore.
 function installReadOnlyGuard(collection, name) {
   const MUTATING = [
     'insert', 'insertOne', 'insertMany', 'update', 'updateOne', 'updateMany', 'replaceOne', 'save',
-    'remove', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete',
-    'bulkWrite', 'drop', 'dropIndex', 'dropIndexes', 'createIndex', 'renameCollection'
+    'remove', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete', 'findAndModify',
+    'bulkWrite', 'initializeOrderedBulkOp', 'initializeUnorderedBulkOp', 'drop', 'dropIndex', 'dropIndexes',
+    'createIndex', 'createIndexes', 'renameCollection'
   ]
   for (const m of MUTATING) {
     collection[m] = function () {
@@ -201,6 +210,13 @@ function parseWindow(startRaw, endRaw) {
   if (start && end && start >= end) throw new Error('PARITY_START must be earlier than PARITY_END')
   return { start, end }
 }
+// The window passed with --eval "PARITY_START=...; PARITY_END=...", if any.
+function windowFromEval() {
+  return parseWindow(
+    typeof PARITY_START !== 'undefined' ? PARITY_START : null,
+    typeof PARITY_END !== 'undefined' ? PARITY_END : null
+  )
+}
 // Mongo range clause for one date field, or null when no bound is set.
 function rangeClause(field, w) {
   if (!w.start && !w.end) return null
@@ -221,11 +237,6 @@ installReadOnlyGuard(collection, 'oj-snapshot')
 const STATUS = ['Saved', 'Started', 'Submitted', 'DulyMade', 'Queried', 'Updated', 'AwaitingDecision', 'Approved', 'Rejected', 'Withdrawn']
 const takenAt = new Date().toISOString()
 
-function uuidStr(v) {
-  if (v === undefined || v === null) return null
-  if (typeof v.toUUID === 'function') return v.toUUID().toString().replace(/^UUID\("?|"?\)$/g, '')
-  return idStr(v)
-}
 function oidStr(v) {
   if (v === undefined || v === null) return null
   return typeof v.toHexString === 'function' ? v.toHexString() : idStr(v)
@@ -253,7 +264,8 @@ function extractPostcode(address) {
 function toPayload(d) {
   const prns = d.prns || {}
   const sites = d.overseasSites && Array.isArray(d.overseasSites.sites) ? d.overseasSites.sites : []
-  const selectedSites = sites.filter((s) => s.selected === true)
+  // OverseasSiteModel.Selected defaults to true, so a stored site with no `selected` field is sent to CM.
+  const selectedSites = sites.filter((s) => s.selected !== false)
   return {
     applicationReference: d.applicationReference,
     organisationName: d.organisationName,
@@ -284,10 +296,7 @@ function toPayload(d) {
   }
 }
 
-const win = parseWindow(
-  typeof PARITY_START !== 'undefined' ? PARITY_START : null,
-  typeof PARITY_END !== 'undefined' ? PARITY_END : null
-)
+const win = windowFromEval()
 const submitted = {
   $or: [{ caseManagementWorkItemId: { $ne: null } }, { applicationStatus: { $nin: ['Saved', 'Started'] } }]
 }
@@ -311,7 +320,7 @@ while (cursor.hasNext()) {
       accreditationNumber: nz(d.accreditationReference),
       organisationName: nz(d.organisationName),
       orgNumber: nz(d.orgId),
-      material: nz(d.materialType) === null ? null : String(enumName(d.materialType, [])).toLowerCase(),
+      material: nz(d.materialType) === null ? null : String(nz(d.materialType)).toLowerCase(),
       year: nz(d.year),
       isExporter: nz(d.isExporter)
     },
