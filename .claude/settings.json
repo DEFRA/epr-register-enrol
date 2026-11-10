@@ -27,6 +27,15 @@
     "allow": [
       "Bash(gh run *)",
       "Bash(gh pr *)"
+    ],
+    "deny": [
+      "Read(./diagnostics/**/*.jsonl)",
+      "Read(./diagnostics/**/*.jsonl*)",
+      "Read(./diagnostics/**/*.archive)",
+      "Read(./diagnostics/**/*.enc)",
+      "Read(./diagnostics/**/out/**)",
+      "Read(./diagnostics/**/parity-summary.*)",
+      "Read(./diagnostics/**/parity-report*)"
     ]
   }
 }
