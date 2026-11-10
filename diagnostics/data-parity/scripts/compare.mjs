@@ -521,7 +521,7 @@ export function toSummary(result, meta) {
           `- **UNMASKED PERSONAL DATA included (--include-pii). Approved by: ${meta.approvedBy}.**`,
           '- **Handling: this summary and the CSV and JSON reports produced with it contain production personal data (names, ' +
             'emails, phone numbers, addresses). Keep them on CDP, a Defra Virtual Desktop or in the store the data owner approved, never on a personal or local machine, in a git workspace or in a synced folder. Share ' +
-            'them only through the channel the data owner approved, with named recipients. Do not paste them, or screenshots of ' +
+            'them only with the data owner, through the channel they approved, and with no one else. Do not paste them, or screenshots of ' +
             'them, into AI tools or chat.**',
           '- **Retention: delete every copy once the report is signed off, and no later than 14 days after the database dump ' +
             '(sooner if the data owner sets a shorter limit). Record the deletion in one line: "deleted <files> on <date> by <name>".**',

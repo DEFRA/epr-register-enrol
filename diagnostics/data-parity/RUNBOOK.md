@@ -27,10 +27,9 @@ These files contain names, emails, phone numbers and addresses from production. 
 - **Retention:** delete the archives, snapshots and reports once the report is signed off, and no later than 14 days
   after the dump (use a shorter limit if your data owner sets one). Record the deletion in one line:
   `deleted <files> on <date> by <name>`.
-- **Sharing the report:** use only the channel approved by the data owner, to a named recipient list. The shared
-  output is `parity-summary.pdf`, `parity-report.csv` and `parity-report-detailed.csv`, but the two CSVs carry
-  names, phone numbers and addresses on every row, so share them only once the data owner has agreed to it. Until
-  then, share the PDF only. Emails are masked in the reports, but names, phone numbers and addresses are not.
+- **Sharing the report:** the output (`parity-summary.pdf`, `parity-report.csv` and `parity-report-detailed.csv`) is
+  shared with the data owner only, through the channel they approved, and with no one else. Emails are masked in the
+  reports, but names, phone numbers and addresses are not; the CSVs carry them on every row.
 
 ## 1. Dump (in CDP)
 
