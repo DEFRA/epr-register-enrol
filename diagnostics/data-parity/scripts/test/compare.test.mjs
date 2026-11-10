@@ -301,7 +301,11 @@ test('--include-pii is refused without an approver and the approver is recorded 
   assert.ok(pdf.startsWith('%PDF-1.4'))
   assert.match(pdf, /UNMASKED PERSONAL DATA/)
   assert.match(pdf, /DPO-1/)
+  // Readers of the summary do not have the run book, so the retention rule is stated in full.
+  assert.match(pdf, /no later than 14 days/)
+  assert.doesNotMatch(pdf, /run book/)
   assert.equal(existsSync(join(dir, 'out', 'parity-summary.md')), false)
+  for (const ext of ['docx', 'xlsx']) assert.equal(existsSync(join(dir, 'out', `parity-summary.${ext}`)), false)
   assert.equal(run().status, 0)
 })
 
@@ -331,12 +335,17 @@ test('summary counts applications by state, with identical pairs included under 
   const r = run(oj, cm)
   const md = toSummary(r, { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
   assert.match(md, /### OJ applications by status\n\n\| OJ status \| Applications \| % of total \|\n\| --- \| --- \| --- \|\n\| DulyMade \| 3 \| 75\.0% \|\n\| Approved \| 1 \| 25\.0% \|\n\| \*\*Total\*\* \| \*\*4\*\* \| 100\.0% \|/)
-  assert.match(md, /\| duly-made \| 2 \| 66\.7% \|\n\| queried \| 1 \| 33\.3% \|/)
+  assert.doesNotMatch(md, /### CM work items by state/)
   // a2 (data), a3 (status), a4 (missing in CM).
-  assert.match(md, /3 applications have at least one difference/)
-  assert.match(md, /\| MISSING_IN_CM \| 1 \| 33\.3% \|/)
-  assert.match(md, /\| STATE_MISMATCH \| 1 \| 33\.3% \|/)
-  assert.match(md, /### By section\n\n.*\n.*\n\| business-plan \| 1 \| 33\.3% \|\n\| sampling-plan \| 1 \| 33\.3% \|\n\| state \| 1 \| 33\.3% \|/)
+  assert.match(md, /3 applications do not fully match between OJ and CM/)
+  assert.match(md, /- In one system but not the other: 1\n- Found in both, but the link between them is inconsistent \(IDENTITY_BREAK\): 0\n- Application data differs in at least one section: 1\n- Status does not match: 1/)
+  // Status is reported in its own section, not as a data section.
+  assert.match(md, /### By section\n\n.*\n.*\n\| business-plan \| 1 \| 33\.3% \|\n\| sampling-plan \| 1 \| 33\.3% \|\n\n/)
+  assert.doesNotMatch(md, /\| state( \/ \w+)? \|/)
+  assert.match(md, /### Status differences\n\nThere are status differences between OJ and CM: 1 application has a status in OJ that does not match CM\.\n/)
+  assert.doesNotMatch(md, /How CM states translate|OJ should show \|/)
+  const clean = toSummary(run(rec('OJ', payload()), rec('CM', payload(), { state: 'duly-made' })), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
+  assert.match(clean, /### Status differences\n\nThere are no status differences between OJ and CM\.\n/)
   assert.match(md, /\| business-plan \/ VALUE_DIFF \| 1 \| 33\.3% \|/)
 })
 
@@ -349,7 +358,7 @@ test('top differing applications say where the differences are in one line', () 
   const line = (k) => md.split('\n').find((l) => l.includes(`| ${k} |`) && l.split('|').length === 7)
   assert.match(md, /\| # \| Application \| CM state \| Rows \| Where the differences are \|/)
   // Numbered from 1, most rows first; CM state before the row count ("-" when there is no CM work item).
-  assert.match(line('RA-1'), /^\| 1 \| RA-1 \| queried \| 3 \| business-plan: 2 VALUE_DIFF; sampling-plan: 1 COUNT_DIFF; status: CM queried maps to OJ Queried, OJ shows DulyMade \|$/)
+  assert.match(line('RA-1'), /^\| 1 \| RA-1 \| queried \| 3 \| business-plan: 2 VALUE_DIFF; sampling-plan: 1 COUNT_DIFF; status: OJ should show Queried \(CM queried\), OJ shows DulyMade \|$/)
   assert.equal(line('RA-2'), '| 2 | RA-2 | - | 1 | MISSING_IN_CM |')
 })
 
@@ -366,13 +375,14 @@ test('row breakdowns each total the quoted number of difference rows, and ITEM_M
   assert.match(md, /- Total rows: 5 \(MATCH rows: 0; status rows: 1; difference rows: 4\)/)
   assert.match(md, /There are 4 difference rows/)
   const tables = md.split('### ').filter((s) => s.startsWith('Difference rows by'))
-  assert.equal(tables.length, 4)
+  assert.equal(tables.length, 3)
+  assert.ok(!tables.some((t) => t.startsWith('Difference rows by issue')))
   for (const t of tables) assert.match(t, /\| \*\*Total\*\* \| \*\*4\*\* \| 100\.0% \|/, t.split('\n')[0])
   assert.match(md, /\| \(no section: application missing on one side or identity break\) \| 1 \| 25\.0% \|/)
   assert.match(md, /\| \(no CM work item\) \| 1 \| 25\.0% \|/)
 })
 
-test('applications by number of sections affected counts each application once and totals the quoted number', () => {
+test('applications with differences are counted once and the removed breakdown tables are not shown', () => {
   const op = (v) => payload({ businessPlan: plan({ otherPercent: v }) })
   const oj = ['a1', 'a2', 'a3', 'a4', 'a5'].map((app, i) => rec('OJ', payload(), { app, wi: `w${i + 1}` }))
   const cm = [
@@ -382,16 +392,10 @@ test('applications by number of sections affected counts each application once a
     rec('CM', payload(), { app: 'a4', wi: 'w4', state: 'duly-made' }) // identical; a5 is missing in CM
   ]
   const md = toSummary(run(oj, cm), { ojTakenAt: 'x', cmTakenAt: 'y', ojWindow: {}, cmWindow: {} })
-  assert.match(md, /4 applications have at least one difference/)
-  assert.ok(md.includes([
-    '### By number of sections affected', '', 'Each application is counted once.', '',
-    '| Sections with differences | Applications | % of applications with differences |', '| --- | --- | --- |',
-    '| 1 section | 1 | 25.0% |',
-    '| 2 sections | 1 | 25.0% |',
-    '| Status only (no section differences) | 1 | 25.0% |',
-    '| Missing on one side or identity break only | 1 | 25.0% |',
-    '| **Total** | **4** | 100.0% |'
-  ].join('\n')), md)
+  assert.match(md, /4 applications do not fully match between OJ and CM/)
+  assert.doesNotMatch(md, /### By number of sections affected/)
+  assert.doesNotMatch(md, /### By issue\n/)
+  assert.match(md, /- Status does not match: 2/)
 })
 
 test('every difference row gets a likely cause, falling back to what the row itself shows', () => {

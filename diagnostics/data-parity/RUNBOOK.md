@@ -1,18 +1,25 @@
 # OJ vs CM parity: run book
 
-Compares every application submitted from OJ to CM, using `mongodump` archives restored into a throwaway local MongoDB.
+Compares every application submitted from OJ to CM, using `mongodump` archives restored into a throwaway MongoDB.
 Nothing runs against the live databases. The [README](README.md) explains what is compared and how to read the report.
 
-You need Docker, `mongosh`, `openssl` (included with Git for Windows) and Node 18+. If `scripts/src/` has changed, run
-`node scripts/build.mjs` in the scripts folder first.
+> **Production data: perform every operation in this run book within CDP.** Run the dump (step 1) in the CDP shell.
+> Run restore, snapshot, compare and clean-up (steps 2 to 5) on a **Defra Virtual Desktop (DVD)**. Never move
+> production archives, snapshots or reports to a personal or local machine. The only exception is sharing the report
+> under the "Sharing the report" rule below. A local machine may be used for steps 2 to 5 with non-production data only.
+
+You need Docker, `mongosh`, `openssl` (included with Git for Windows) and Node 18+ wherever steps 2 to 5 run. This run
+book assumes the Defra Virtual Desktop provides all four. If `scripts/src/` has changed, run `node scripts/build.mjs`
+in the scripts folder first.
 
 ## Handling rules (production data)
 
 These files contain names, emails, phone numbers and addresses from production. Throughout:
 
-- **Work outside the repository and outside any synced folder** (for example `C:\secure\parity-<date>` on a
-  BitLocker-encrypted disk). Never keep archives, snapshots or reports inside the git workspace. `diagnostics/.gitignore`
-  and the Claude Code deny rules are a backstop only.
+- **Production data stays within CDP:** the CDP shell for the dump, then a Defra Virtual Desktop for everything else.
+- **Work outside the repository and outside any synced folder** (for example `C:\secure\parity-<date>` on the Defra
+  Virtual Desktop, or on a BitLocker-encrypted disk for non-production data). Never keep archives, snapshots or reports
+  inside the git workspace. `diagnostics/.gitignore` and the Claude Code deny rules are a backstop only.
 - **Do not paste output, files or screenshots into AI tools or chat.** Describe a problem instead.
 - **Retention:** delete the archives, snapshots and reports once the report is signed off, and no later than 14 days
   after the dump (use a shorter limit if your data owner sets one). Record the deletion in one line:
@@ -36,10 +43,11 @@ rm oj.backup.archive cm.backup.archive
 
 - Do not print or paste `MONGO_URI`; it contains credentials.
 - Take both dumps close together and note when. Check the names are not swapped.
-- Move only the `.enc` files, by the route your platform team approves, then **delete them from the CDP shell**.
+- Move only the `.enc` files, by the route your platform team approves, then **delete them from the CDP shell**. For
+  production data the destination must be a Defra Virtual Desktop. For non-production data it may be a local machine.
 - Send the passphrase by a different channel from the files.
 
-## 2. Restore (local)
+## 2. Restore (Defra Virtual Desktop; local for non-production data only)
 
 Work in your secure folder. Decrypt, then restore into a scratch instance that only listens on localhost and keeps its
 data in memory (`--tmpfs`), so nothing is written to disk. `mongorestore` is not part of mongosh, so run it in the
@@ -64,7 +72,7 @@ mongosh "mongodb://localhost:27018" --quiet --eval "db.adminCommand({listDatabas
 
 If one is missing, the dump user could not read it. Ask for a dump from a user who can.
 
-## 3. Snapshot (local)
+## 3. Snapshot (Defra Virtual Desktop; local for non-production data only)
 
 Set `$S` to the `diagnostics/data-parity/scripts` folder of your repository checkout. Optional window: `PARITY_START` is
 inclusive, `PARITY_END` is exclusive, ISO-8601 (UTC if no offset). Use the same window for both runs. To include all of
@@ -92,7 +100,7 @@ mongosh "mongodb://localhost:27018/<cm database>" --quiet --eval "$W" --file "$S
 The snapshot time in each file is when the script ran, not when the dump was taken, so the report's snapshot gap reads
 near zero. If the dumps were taken far apart, treat `oj-edit-not-resubmitted` and `oj-post-decision-edit` rows with care.
 
-## 4. Compare
+## 4. Compare (Defra Virtual Desktop; local for non-production data only)
 
 ```bash
 node "$S/compare.mjs" oj.jsonl cm.jsonl --out ./out
@@ -107,16 +115,15 @@ controlled follow-up and delete the output as soon as it is done.
 The compare refuses a file with a missing or mismatched trailer count, the wrong service or an unsupported script
 version, and warns if the two files used different windows. Outputs in `./out`:
 
-- `parity-summary.pdf`: counts, window, warnings; applications by OJ status and CM state (count and %); applications
-  with differences counted by number of sections affected (each counted once), by issue, by section, and by section and
-  issue; top differing applications with a one-line
+- `parity-summary.pdf`: counts, window, warnings; applications by OJ status (count and %); applications
+  with differences counted by section, and by section and issue; top differing applications with a one-line
   summary of where their differences are (A4, written by `scripts/pdf.mjs` with no
   dependencies). Row breakdowns each total the quoted number of difference rows. List items present on one side only
   (`ITEM_MISSING_CM` / `ITEM_MISSING_OJ`) are left out of the summary but kept in the CSVs.
 - `parity-report.csv`: one row per application; the `issues` cell lists everything that differs.
 - `parity-report-detailed.csv`: one row per difference, for filtering and pivoting.
 
-## 5. Clean up
+## 5. Clean up (on the machine where steps 2 to 4 ran)
 
 ```powershell
 docker rm -fv parity-scratch

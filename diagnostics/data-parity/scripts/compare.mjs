@@ -297,7 +297,7 @@ export function compare(ojRecords, cmRecords, { ojTakenAt, cmTakenAt, includeMat
     for (const r of records) m.set(r.state?.raw ?? '(none)', (m.get(r.state?.raw ?? '(none)') ?? 0) + 1)
     return m
   }
-  return { rows, matched, gap, ojCount: ojRecords.length, cmCount: cmRecords.length, ojStates: byState(ojRecords), cmStates: byState(cmRecords) }
+  return { rows, matched, gap, ojCount: ojRecords.length, cmCount: cmRecords.length, ojStates: byState(ojRecords) }
 }
 
 // ---------- output ----------
@@ -367,29 +367,6 @@ const appTable = (title, label, entries, total) =>
   `### ${title}\n\n| ${label} | Applications | % of applications with differences |\n| --- | --- | --- |\n` +
   (entries.map(([k, n]) => `| ${k} | ${n} | ${pct(n, total)} |`).join('\n') || '| (none) | 0 | - |') + '\n'
 
-// Puts each application with differences in exactly one bucket, by how many data sections differ, so it totals `total`.
-function sectionsAffectedTable(diffRows, total) {
-  const byApp = new Map()
-  for (const r of diffRows) {
-    const e = byApp.get(appKey(r)) ?? { sections: new Set(), status: false }
-    if (r.section === 'state') e.status = true
-    else if (r.section) e.sections.add(r.section)
-    byApp.set(appKey(r), e)
-  }
-  const counts = new Map()
-  for (const { sections, status } of byApp.values()) {
-    const k = sections.size ? sections.size : status ? -1 : -2
-    counts.set(k, (counts.get(k) ?? 0) + 1)
-  }
-  const label = (k) =>
-    k === -1 ? 'Status only (no section differences)'
-      : k === -2 ? 'Missing on one side or identity break only'
-        : `${k} section${k === 1 ? '' : 's'}`
-  const order = [...counts.keys()].sort((a, b) => (a < 0) - (b < 0) || (a < 0 ? b - a : a - b))
-  const body = order.map((k) => `| ${label(k)} | ${counts.get(k)} | ${pct(counts.get(k), total)} |`).join('\n') || '| (none) | 0 | - |'
-  return `### By number of sections affected\n\nEach application is counted once.\n\n| Sections with differences | Applications | % of applications with differences |\n| --- | --- | --- |\n${body}\n| **Total** | **${total}** | ${total ? '100.0%' : '-'} |\n`
-}
-
 export const TOP_APPLICATIONS = 50
 
 // Says whether the top table is the full list or cut off, and which applications it can never include.
@@ -403,6 +380,15 @@ function topNote(listed, statusOnly) {
     ? ` ${statusOnly} application${statusOnly === 1 ? ' whose' : 's whose'} only difference is status ${statusOnly === 1 ? 'is' : 'are'} not listed here.`
     : ''
   return scope + status
+}
+
+// States only whether any application's OJ status differs from its CM state (compared through STATE_MAP).
+function statusSection(statusRows) {
+  const n = new Set(statusRows.map(appKey)).size
+  const verdict = n === 0
+    ? 'There are no status differences between OJ and CM.'
+    : `There are status differences between OJ and CM: ${n} application${n === 1 ? ' has' : 's have'} a status in OJ that does not match CM.`
+  return `### Status differences\n\n${verdict}\n`
 }
 
 const SUMMARY_HIDDEN = new Set(['ITEM_MISSING_CM', 'ITEM_MISSING_OJ'])
@@ -436,8 +422,8 @@ export function toSummary(result, meta) {
   const statusNote = new Map()
   for (const r of diffRows.filter((x) => x.differenceType === 'STATE_MISMATCH' || x.differenceType === 'STATE_UNMAPPED')) {
     statusNote.set(appName(r), r.differenceType === 'STATE_UNMAPPED'
-      ? `status: CM state ${r.cmState} has no OJ mapping (OJ ${r.ojState})`
-      : `status: CM ${r.cmState} maps to OJ ${STATE_MAP[r.cmState]}, OJ shows ${r.ojState}`)
+      ? `status: CM ${r.cmState} has no OJ translation, OJ shows ${r.ojState}`
+      : `status: OJ should show ${STATE_MAP[r.cmState]} (CM ${r.cmState}), OJ shows ${r.ojState}`)
   }
   const whereLine = (k) => [
     ...[...where.get(k).entries()].map(([place, issues]) =>
@@ -456,33 +442,40 @@ export function toSummary(result, meta) {
   const issueApps = new Set(diffRows.map(appKey)).size
   const appsWithDiffRows = new Set(diffs.map(appKey))
   const statusOnlyApps = new Set(diffRows.filter((r) => r.section === 'state' && !appsWithDiffRows.has(appKey(r))).map(appKey)).size
+  const appsOf = (pred) => new Set(diffRows.filter(pred).map(appKey)).size
+  const statusRows = diffRows.filter((r) => r.section === 'state')
+  const dataRows = diffs.filter((r) => r.section)
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
   const appsSection = [
     '## Applications by state',
     '',
     stateTable('OJ applications by status', 'OJ status', result.ojStates, ojCount),
-    stateTable('CM work items by state', 'CM state', result.cmStates, cmCount),
     '## Applications with differences',
     '',
-    `${issueApps} applications have at least one difference, including applications missing on one side and status differences. ` +
-      'OJ and CM name their states differently, so status is not compared by name: each CM state is mapped to the OJ status it ' +
-      'should project to (for example duly-made to DulyMade), and a STATE_MISMATCH means OJ shows a different status from that ' +
-      'mapping (STATE_UNMAPPED: the CM state has no mapping). These appear under section "state".',
+    `${plural(issueApps, 'application does', 'applications do')} not fully match between OJ and CM. ` +
+      'An application can have more than one kind of difference, so these can add up to more than the total:',
     '',
-    sectionsAffectedTable(diffRows, issueApps),
-    'In the next three tables an application can have more than one issue and appear in more than one section, so their ' +
-      'counts and percentages can add up to more than the total.',
+    `- In one system but not the other: ${appsOf((r) => r.differenceType === 'MISSING_IN_CM' || r.differenceType === 'MISSING_IN_OJ')}`,
+    `- Found in both, but the link between them is inconsistent (IDENTITY_BREAK): ${appsOf((r) => r.differenceType === 'IDENTITY_BREAK')}`,
+    `- Application data differs in at least one section: ${new Set(dataRows.map(appKey)).size}`,
+    `- Status does not match: ${new Set(statusRows.map(appKey)).size}`,
     '',
-    appTable('By issue', 'Issue', appTally(diffRows, (r) => r.differenceType), issueApps),
-    appTable('By section', 'Section', appTally(diffRows.filter((r) => r.section), (r) => r.section), issueApps),
-    appTable('By section and issue', 'Section / issue', appTally(diffRows.filter((r) => r.section), (r) => `${r.section} / ${r.differenceType}`), issueApps),
+    '### Application data differences',
+    '',
+    'Counts are applications. A section differs when at least one field in it differs. VALUE_DIFF means a field has a ' +
+      'different value; COUNT_DIFF means a list has a different number of items. An application can appear under ' +
+      'several sections, so the percentages (of all applications with differences) can add up to more than 100%.',
+    '',
+    appTable('By section', 'Section', appTally(dataRows, (r) => r.section), issueApps),
+    appTable('By section and issue', 'Section / issue', appTally(dataRows, (r) => `${r.section} / ${r.differenceType}`), issueApps),
+    statusSection(statusRows),
     '## Row counts',
     '',
     `Each row is one individual difference. There are ${diffs.length} difference rows; the ${diffRows.length - diffs.length} status rows ` +
-      'are covered under Applications with differences above. Each table below breaks down the same ' +
+      'are covered under Status differences above. Each table below breaks down the same ' +
       `${diffs.length} rows, so every table totals ${diffs.length}.`,
     '',
     rowTable('Difference rows by section', 'Section', tally(diffs, (r) => r.section, '(no section: application missing on one side or identity break)')),
-    rowTable('Difference rows by issue', 'Issue', tally(diffs, (r) => r.differenceType)),
     rowTable('Difference rows by CM state', 'CM state', tally(diffs, (r) => r.cmState, '(no CM work item)')),
     // A row with several likely causes is counted once, under the combination.
     rowTable('Difference rows by likely cause', 'Likely cause', tally(diffs, (r) => (r.likelyCause ? r.likelyCause.split('|').join(' + ') : ''), '(none identified)'))
@@ -491,7 +484,16 @@ export function toSummary(result, meta) {
     '# OJ vs CM parity summary',
     '',
     ...(meta.approvedBy
-      ? [`- **UNMASKED PERSONAL DATA included (--include-pii). Approved by: ${meta.approvedBy}. Delete with the retention rule in the run book.**`, '']
+      ? [
+          `- **UNMASKED PERSONAL DATA included (--include-pii). Approved by: ${meta.approvedBy}.**`,
+          '- **Handling: this summary and the CSV and JSON reports produced with it contain production personal data (names, ' +
+            'emails, phone numbers, addresses). Keep them on CDP, a Defra Virtual Desktop or in the store the data owner approved, never on a personal or local machine, in a git workspace or in a synced folder. Share ' +
+            'them only through the channel the data owner approved, with named recipients. Do not paste them, or screenshots of ' +
+            'them, into AI tools or chat.**',
+          '- **Retention: delete every copy once the report is signed off, and no later than 14 days after the database dump ' +
+            '(sooner if the data owner sets a shorter limit). Record the deletion in one line: "deleted <files> on <date> by <name>".**',
+          ''
+        ]
       : []),
     `- OJ snapshot taken: ${meta.ojTakenAt}`,
     `- CM snapshot taken: ${meta.cmTakenAt}`,

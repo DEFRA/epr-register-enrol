@@ -6,3 +6,5 @@
 *.enc
 *.gz
 out/
+parity-summary.*
+parity-report*

@@ -1,6 +1,7 @@
 // Minimal Markdown -> PDF renderer for the parity summary. No dependencies: it uses the PDF standard fonts
 // (Helvetica, Helvetica-Bold), so nothing is embedded or downloaded.
 // Handles what toSummary emits: #/##/### headings, "- " bullets, **bold** and `code` spans, pipe tables, paragraphs.
+import { parseMarkdown, titleOf, plainText } from './markdown.mjs'
 
 // Advance widths (1/1000 em) for character codes 32..126, from the standard Helvetica AFM metrics.
 const HELVETICA = [
@@ -170,9 +171,10 @@ class Layout {
   table(rows) {
     const [header, ...body] = rows
     const cols = Math.max(...rows.map((r) => r.length))
-    const isNumber = (s) => /^-?\d[\d,]*(\.\d+)?%?$/.test(s.trim())
+    const isNumber = (s) => /^-?\d[\d,]*(\.\d+)?%?$/.test(plainText(s).trim())
+    // The small allowance stops floating-point rounding from wrapping a cell that exactly fits its column.
     const natural = Array.from({ length: cols }, (_, c) =>
-      Math.max(...rows.map((r, i) => lineWidth(words(r[c] ?? '', i === 0), TABLE))) + 2 * PAD)
+      Math.max(...rows.map((r, i) => lineWidth(words(r[c] ?? '', i === 0), TABLE))) + 2 * PAD + 0.01)
     const widths = fitColumns(natural)
     const lead = TABLE * 1.3
 
@@ -220,35 +222,17 @@ export function fitColumns(natural, available = CONTENT_W) {
   return natural.map((w) => (w * available) / total)
 }
 
-const splitRow =(line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
-const isSeparator = (line) => splitRow(line).every((c) => /^:?-{3,}:?$/.test(c))
-
 export function markdownToPdf(md) {
   const layout = new Layout()
-  const lines = md.split(/\r?\n/)
-  let title = 'Report'
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const h = /^(#{1,6})\s+(.*)$/.exec(line)
-    if (h) {
-      if (h[1].length === 1 && title === 'Report') title = h[2]
-      layout.heading(h[2], h[1].length)
-    } else if (line.trim().startsWith('|')) {
-      const rows = []
-      while (i < lines.length && lines[i].trim().startsWith('|')) {
-        if (!isSeparator(lines[i])) rows.push(splitRow(lines[i]))
-        i++
-      }
-      i--
-      layout.table(rows)
-    } else if (/^\s*[-*]\s+/.test(line)) {
-      layout.text(words(line.replace(/^\s*[-*]\s+/, '')), { bullet: true })
-    } else if (line.trim() === '') {
-      layout.gap(BODY * 0.6)
-    } else {
-      layout.text(words(line))
-    }
+  const blocks = parseMarkdown(md)
+  for (const b of blocks) {
+    if (b.type === 'heading') layout.heading(b.text, b.level)
+    else if (b.type === 'table') layout.table(b.rows)
+    else if (b.type === 'bullet') layout.text(words(b.text), { bullet: true })
+    else if (b.type === 'blank') layout.gap(BODY * 0.6)
+    else layout.text(words(b.text))
   }
+  const title = titleOf(blocks)
 
   // Footer, now that the page count is known.
   const n = layout.pages.length

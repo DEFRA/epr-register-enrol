@@ -11,6 +11,7 @@ Read-only, point-in-time comparison of every application submitted from OJ (`epr
 | `scripts/cm-snapshot.js` | mongosh, CM `workItems` (`re-accreditation`) -> JSONL |
 | `scripts/compare.mjs` | Offline diff -> CSV + PDF summary |
 | `scripts/pdf.mjs` | Renders the summary to PDF (standard fonts, no dependencies) |
+| `scripts/markdown.mjs` | Parses the summary text for `pdf.mjs` |
 | `scripts/src/` | Sources. The two snapshot scripts are **generated** (`node scripts/build.mjs`) so both share one normaliser. Edit `src/`, rebuild, commit both. |
 
 Both snapshot scripts replace every write method on the collection with a throw. The team has confirmed that the legacy
