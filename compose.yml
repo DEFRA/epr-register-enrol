@@ -48,8 +48,21 @@ services:
     networks:
       - cdp-tenant
 
+  # RA-739: single-node replica set, as in the operator backend's compose.
+  # management-be's all-or-nothing submissions use multi-document
+  # transactions, which only work on a replica set. The healthcheck initiates
+  # it on first run and is a no-op afterwards. From the host, connect with
+  # directConnection=true.
+  # The set name comes from a config file, not --replSet: the image's
+  # entrypoint drops a config file's `replication` section (but not
+  # --replSet) for the temporary mongod that runs the init scripts, so they
+  # can still write before the set is initiated.
   mongodb:
     image: mongo:7.0.28
+    command: ['--config', '/etc/mongod-replica-set.conf', '--bind_ip_all']
+    configs:
+      - source: mongod-replica-set
+        target: /etc/mongod-replica-set.conf
     networks:
       - cdp-tenant
     ports:
@@ -58,11 +71,12 @@ services:
       - ./lib/epr-register-enrol-management-fe/compose/mongo:/docker-entrypoint-initdb.d:ro
       - mongodb-data:/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.hello().ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongodb:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
 
   ################################################################################
 
@@ -77,7 +91,7 @@ services:
       floci:
         condition: service_healthy
       mongodb:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - ./lib/epr-register-enrol-management-be/compose/aws.env
     environment:
@@ -200,7 +214,7 @@ services:
       floci:
         condition: service_healthy
       mongodb:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
       cdp-uploader:
@@ -406,3 +420,10 @@ volumes:
 networks:
   cdp-tenant:
     driver: bridge
+
+configs:
+  # The mongodb service's replica set name (see its comment).
+  mongod-replica-set:
+    content: |
+      replication:
+        replSetName: rs0
