@@ -210,6 +210,9 @@ services:
       DevSeedData__Enabled: "true"
       # RA-425: the registration status endpoint the /manage pages read.
       FeatureFlags__InYearChangesEnabled: "true"
+      # RA-739: submitting an add-ORS change request sends it to the real
+      # case-management-backend, which raises one work item per site.
+      AccreditationChanges__SubmitToCaseManagement: "true"
     depends_on:
       floci:
         condition: service_healthy
