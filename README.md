@@ -64,6 +64,16 @@ A root [`compose.yml`](compose.yml) brings up all four services plus their
 shared dependencies (MongoDB, Redis, and the Floci AWS emulator) on a single
 Docker network.
 
+MongoDB runs as a single-node replica set (`rs0`), because both backends use
+multi-document transactions (RA-739). Its healthcheck initiates the set on
+first start, and an existing `mongodb-data` volume keeps its data. From the
+host, connect with `directConnection=true`, because the set advertises its
+member as `mongodb:27017`:
+
+```bash
+mongosh "mongodb://127.0.0.1:27017/?directConnection=true"
+```
+
 Start the full stack with hot-reload:
 
 ```bash
