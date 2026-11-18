@@ -371,6 +371,11 @@ services:
       MANAGEMENT_BE_URL: http://case-management-backend:8085
       OPERATOR_BACKEND_URL: http://epr-register-enrol-backend:8080
       CDP_UPLOADER_URL: http://cdp-uploader:7337
+      # RA-495: management-be pushes status to the operator backend here
+      # (OperatorBackendApi__Enabled), and the add-ORS operator-journey spec
+      # resets its seeded org through this stack's MongoDB.
+      CASE_MANAGEMENT_PUSH_ENABLED: "true"
+      MONOREPO_MONGO_URL: mongodb://mongodb:27017/?directConnection=true
     depends_on:
       case-management-frontend:
         condition: service_started
