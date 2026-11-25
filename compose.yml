@@ -107,8 +107,14 @@ services:
       OperatorBackendApi__Enabled: "true"
       OperatorBackendApi__URL: "http://epr-register-enrol-backend:8080"
       OPERATOR_BACKEND_SHARED_SECRET: "local-dev-secret"
-      
-      
+      # RA-769: an `e2e-` organisation (ADR-0009) shows a stable test
+      # accreditation on an In-Year Change case's Accreditation summary tab,
+      # so the mgmt-tests Accreditation summary tab spec
+      # (ra-769-accreditation-summary-tab.e2e.js) gets a stable accreditation
+      # for its `e2e-` organisation. As in the mgmt-tests compose, on unless
+      # switched off; never on in prod (startup refuses it).
+      TestOrganisations__Enabled: ${TEST_ORGANISATIONS_ENABLED:-true}
+
     networks:
       - cdp-tenant
     develop:
