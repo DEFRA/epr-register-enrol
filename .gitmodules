@@ -22,3 +22,6 @@
 [submodule "lib/epr-register-enrol-defra-id-stub"]
 	path = lib/epr-register-enrol-defra-id-stub
 	url = git@github.com:DEFRA/epr-register-enrol-defra-id-stub.git
+[submodule "lib/epr-register-enrol-admin"]
+	path = lib/epr-register-enrol-admin
+	url = git@github.com:DEFRA/epr-register-enrol-admin.git
